@@ -84,21 +84,14 @@ const voteTrack = async (id) => {
   if (!snap.exists()) return;
 
   const data = snap.data();
-  const hasVoted = data.votedBy?.includes(userId);
 
-  if (hasVoted) {
-    // 👎 retirer vote
-    await updateDoc(ref, {
-      votes: increment(-1),
-      votedBy: arrayRemove(userId),
-    });
-  } else {
-    // 👍 ajouter vote
-    await updateDoc(ref, {
-      votes: increment(1),
-      votedBy: arrayUnion(userId),
-    });
-  }
+  // 🚫 déjà voté → on bloque
+  if (data.votedBy?.includes(userId)) return;
+
+  await updateDoc(ref, {
+    votes: increment(1),
+    votedBy: arrayUnion(userId),
+  });
 };
 
   return (
