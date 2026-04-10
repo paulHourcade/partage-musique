@@ -311,15 +311,35 @@ export default function App() {
       {/* =========================
           ❌ DELETE MODAL
       ========================= */}
-      {trackToDelete && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <p>Supprimer cette musique ?</p>
-            <button onClick={() => setTrackToDelete(null)}>Annuler</button>
-            <button onClick={confirmDelete}>Supprimer</button>
+        {trackToDelete && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modal}>
+        
+              <p style={{ marginBottom: 12 }}>
+                Supprimer cette musique ?
+              </p>
+        
+              <div style={{ display: "flex", gap: 10 }}>
+        
+                <button
+                  style={styles.cancelBtn}
+                  onClick={() => setTrackToDelete(null)}
+                >
+                  Annuler
+                </button>
+        
+                <button
+                  style={styles.deleteBtn}
+                  onClick={confirmDelete}
+                >
+                  Supprimer
+                </button>
+        
+              </div>
+        
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* =========================
           👀 VOTE MODAL (NEW)
@@ -329,12 +349,12 @@ export default function App() {
           <div style={styles.modal}>
 
             {/* fermeture */}
-            <button
-              style={{ float: "right" }}
-              onClick={() => setSelectedTrack(null)}
-            >
-              ✕
-            </button>
+              <button
+                style={styles.closeBtn}
+                onClick={() => setSelectedTrack(null)}
+              >
+                ✕
+              </button>
 
             <h3>Votes</h3>
 
@@ -460,5 +480,39 @@ const styles = {
     padding: 20,
     borderRadius: 12,
     width: 260,
+  },
+
+  closeBtn: {
+  fontSize: 28,
+  color: "#ef4444",
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  float: "right",
+  fontWeight: "bold",
+  padding: 4,
+},
+
+  cancelBtn: {
+    flex: 1,
+    padding: "12px",
+    border: "none",
+    background: "#e5e7eb",
+    borderRadius: 10,
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: 14,
+  },
+  
+  deleteBtn: {
+    flex: 1,
+    padding: "12px",
+    border: "none",
+    background: "#ef4444",
+    color: "white",
+    borderRadius: 10,
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: 14,
   },
 };
