@@ -136,23 +136,38 @@ export default function App() {
             <div style={styles.empty}>Aucun morceau</div>
           ) : (
             tracks.map((item, index) => (
-              <div key={item.id} style={styles.item}>
 
-                {/* 🎵 Infos musique */}
-                  <span>
-                    {index + 1}. {item.title} - {item.artist || "Unknown"} 
-                    {" "}👍 {item.votes || 0}
-                  </span>
-
-                {/* ❌ Bouton suppression */}
-                <button
-                  style={styles.delete}
-                  onClick={() => removeTrack(item.id)}
-                >
-                  ✕
-                </button>
-
+            <div key={item.id} style={styles.itemRow}>
+            
+              {/* ❌ bouton suppression à gauche */}
+              <button
+                style={styles.delete}
+                onClick={() => removeTrack(item.id)}
+              >
+                ✕
+              </button>
+            
+              {/* 🎵 contenu principal */}
+              <div style={styles.item}>
+                <div style={styles.text}>
+                  <div style={styles.titleText}>
+                    {item.title}
+                  </div>
+                  <div style={styles.artistText}>
+                    {item.artist || "Unknown"}
+                  </div>
+                </div>
+            
+                {/* 👍 votes à droite */}
+                <div style={styles.votes}>
+                  👍 {item.votes || 0}
+                </div>
               </div>
+            
+            </div>
+
+
+              
             ))
           )}
         </div>
