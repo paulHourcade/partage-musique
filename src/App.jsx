@@ -12,8 +12,9 @@ import {
 } from "firebase/firestore";
 
 export default function App() {
-  const [song, setSong] = useState("");
-  const [queue, setQueue] = useState([]);
+  const [title, setTitle] = useState("");
+  const [artist, setArtist] = useState("");
+  const [tracks, setTracks] = useState([]);
 
   const colRef = collection(db, "tracks");
   const q = query(colRef, orderBy("createdAt", "desc"));
@@ -21,7 +22,7 @@ export default function App() {
   // 📡 écoute temps réel
   useEffect(() => {
     const unsub = onSnapshot(q, (snapshot) => {
-      setQueue(
+      setTracks(
         snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -33,19 +34,23 @@ export default function App() {
   }, []);
 
   // ➕ ajouter un son
-  const addSong = async () => {
-    if (!song.trim()) return;
+  const addTrack = async () => {
+    if (!title.trim()) return;
 
     await addDoc(colRef, {
-      title: song,
+      title,
+      artist: artist || "Unknown",
       createdAt: Date.now(),
+      votes: 0,
+      votedBy: [],
     });
 
-    setSong("");
+    setTitle("");
+    setArtist("");
   };
 
   // ❌ supprimer
-  const removeSong = async (id) => {
+  const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
@@ -54,33 +59,41 @@ export default function App() {
       <div style={styles.card}>
         <h1 style={styles.title}>🎵 Music Queue</h1>
 
-        <div style={styles.inputRow}>
+        {/* INPUTS */}
+        <div style={styles.inputCol}>
           <input
             style={styles.input}
-            value={song}
-            onChange={(e) => setSong(e.target.value)}
-            placeholder="Ajouter un son..."
-            onKeyDown={(e) => e.key === "Enter" && addSong()}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Titre du son"
           />
 
-          <button style={styles.button} onClick={addSong}>
+          <input
+            style={styles.input}
+            value={artist}
+            onChange={(e) => setArtist(e.target.value)}
+            placeholder="Artiste"
+          />
+
+          <button style={styles.button} onClick={addTrack}>
             Ajouter
           </button>
         </div>
 
+        {/* LISTE */}
         <div style={styles.list}>
-          {queue.length === 0 ? (
+          {tracks.length === 0 ? (
             <div style={styles.empty}>Aucun morceau</div>
           ) : (
-            queue.map((item, index) => (
+            tracks.map((item, index) => (
               <div key={item.id} style={styles.item}>
                 <span>
-                  {index + 1}. {item.title}
+                  {index + 1}. {item.title} - {item.artist || "Unknown"}
                 </span>
 
                 <button
                   style={styles.delete}
-                  onClick={() => removeSong(item.id)}
+                  onClick={() => removeTrack(item.id)}
                 >
                   ✕
                 </button>
@@ -118,14 +131,14 @@ const styles = {
     marginBottom: 20,
   },
 
-  inputRow: {
+  inputCol: {
     display: "flex",
+    flexDirection: "column",
     gap: 10,
     marginBottom: 20,
   },
 
   input: {
-    flex: 1,
     padding: 12,
     border: "1px solid #ddd",
     borderRadius: 10,
