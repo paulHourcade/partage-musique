@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
-import { updateDoc, doc, increment } from "firebase/firestore";
-import { db } from "./firebase"; // ton config
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
-
 
 import {
   collection,
@@ -13,19 +9,23 @@ import {
   onSnapshot,
   orderBy,
   query,
+  updateDoc,
+  increment,
 } from "firebase/firestore";
 
 export default function App() {
-  const [song, setSong] = useState("");
-  const [queue, setQueue] = useState([]);
+  const [title, setTitle] = useState("");
+  const [artist, setArtist] = useState("");
+  const [tracks, setTracks] = useState([]);
 
+  // 📦 collection Firestore
   const colRef = collection(db, "tracks");
   const q = query(colRef, orderBy("createdAt", "desc"));
 
-  // 📡 écoute temps réel
+  // 📡 realtime listener
   useEffect(() => {
     const unsub = onSnapshot(q, (snapshot) => {
-      setQueue(
+      setTracks(
         snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -37,86 +37,92 @@ export default function App() {
   }, []);
 
   // ➕ ajouter un son
-  const addSong = async () => {
-    if (!song.trim()) return;
+  const addTrack = async () => {
+    if (!title.trim()) return;
 
     await addDoc(colRef, {
-      title: song,
+      title,
+      artist: artist || "Unknown",
+      votes: 0,
       createdAt: Date.now(),
     });
 
-    setSong("");
+    setTitle("");
+    setArtist("");
   };
 
   // ❌ supprimer
-  const removeSong = async (id) => {
+  const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
+  // 👍 voter
+  const voteTrack = async (id) => {
+    const ref = doc(db, "tracks", id);
 
-const voteTrack = async (id) => {
-  const trackRef = doc(db, "tracks", id);
-
-  await updateDoc(trackRef, {
-    votes: increment(1)
-  });
-};
-
-  useEffect(() => {
-  const q = query(
-    collection(db, "tracks"),
-    orderBy("votes", "desc"),
-    orderBy("createdAt", "asc")
-  );
-
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const tracksData = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    setTracks(tracksData);
-  });
-
-  return () => unsubscribe();
-}, []);
-  
+    await updateDoc(ref, {
+      votes: increment(1),
+    });
+  };
 
   return (
     <div style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.title}>🎵 Music Queue</h1>
 
-        <div style={styles.inputRow}>
+        {/* INPUTS */}
+        <div style={styles.inputCol}>
           <input
             style={styles.input}
-            value={song}
-            onChange={(e) => setSong(e.target.value)}
-            placeholder="Ajouter un son..."
-            onKeyDown={(e) => e.key === "Enter" && addSong()}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Titre du son"
           />
 
-          <button style={styles.button} onClick={addSong}>
+          <input
+            style={styles.input}
+            value={artist}
+            onChange={(e) => setArtist(e.target.value)}
+            placeholder="Artiste (optionnel)"
+          />
+
+          <button style={styles.button} onClick={addTrack}>
             Ajouter
           </button>
         </div>
 
+        {/* LISTE */}
         <div style={styles.list}>
-          {queue.length === 0 ? (
+          {tracks.length === 0 ? (
             <div style={styles.empty}>Aucun morceau</div>
           ) : (
-            queue.map((item, index) => (
+            tracks.map((item, index) => (
               <div key={item.id} style={styles.item}>
-                <span>
-                  {index + 1}. {item.title}
-                </span>
+                <div>
+                  <div style={{ fontWeight: "bold" }}>
+                    {index + 1}. {item.title}
+                  </div>
 
-                <button
-                  style={styles.delete}
-                  onClick={() => removeSong(item.id)}
-                >
-                  ✕
-                </button>
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    {item.artist}
+                  </div>
+                </div>
+
+                <div style={styles.actions}>
+                  <button
+                    style={styles.vote}
+                    onClick={() => voteTrack(item.id)}
+                  >
+                    👍 {item.votes || 0}
+                  </button>
+
+                  <button
+                    style={styles.delete}
+                    onClick={() => removeTrack(item.id)}
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             ))
           )}
@@ -126,6 +132,7 @@ const voteTrack = async (id) => {
   );
 }
 
+/* 🎨 STYLES */
 const styles = {
   page: {
     minHeight: "100vh",
@@ -150,14 +157,14 @@ const styles = {
     marginBottom: 20,
   },
 
-  inputRow: {
+  inputCol: {
     display: "flex",
+    flexDirection: "column",
     gap: 10,
     marginBottom: 20,
   },
 
   input: {
-    flex: 1,
     padding: 12,
     border: "1px solid #ddd",
     borderRadius: 10,
@@ -181,10 +188,25 @@ const styles = {
   item: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     padding: 12,
     border: "1px solid #eee",
     borderRadius: 10,
     background: "#fafafa",
+  },
+
+  actions: {
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+  },
+
+  vote: {
+    border: "none",
+    background: "#e2e8f0",
+    padding: "6px 10px",
+    borderRadius: 8,
+    cursor: "pointer",
   },
 
   delete: {
@@ -192,6 +214,7 @@ const styles = {
     background: "transparent",
     color: "red",
     cursor: "pointer",
+    fontSize: 16,
   },
 
   empty: {
