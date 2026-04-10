@@ -103,6 +103,7 @@ export default function App() {
     await addDoc(colRef, {
       title,
       artist: artist || "Unknown",
+      spotifyId: "xxxxx", // 🔥 important
       createdAt: Date.now(),
       votes: 0,
       votedBy: [],
