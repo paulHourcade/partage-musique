@@ -377,4 +377,24 @@ const styles = {
     color: "white",
     borderRadius: 8,
   },
+
+  voteBox: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 40,
+    marginRight: 6,
+  },
+  
+  voteIcon: {
+    fontSize: 14,
+  },
+  
+  voteCount: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#111",
+  },
+
 };
