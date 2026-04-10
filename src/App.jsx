@@ -76,6 +76,7 @@ const userId = getUserId();
   };
 
   // 👍 voter
+
 const voteTrack = async (id) => {
   const ref = doc(db, "tracks", id);
   const snap = await getDoc(ref);
@@ -86,7 +87,7 @@ const voteTrack = async (id) => {
   const hasVoted = data.votedBy?.includes(userId);
 
   if (hasVoted) {
-    // ❌ retirer vote
+    // 👎 retirer vote
     await updateDoc(ref, {
       votes: increment(-1),
       votedBy: arrayRemove(userId),
