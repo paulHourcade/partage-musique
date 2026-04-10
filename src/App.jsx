@@ -15,15 +15,25 @@ import {
 export default function App() {
 
   // =========================
-  // 🎯 INPUT STATES
+  // 🎵 INPUT MUSIQUE
   // =========================
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
+
+  // =========================
+  // 📦 LISTE MUSIQUES
+  // =========================
   const [tracks, setTracks] = useState([]);
 
   // =========================
-  // 👤 USER ID LOCAL
+  // 👤 AUTH SIMPLE (USER)
   // =========================
+  const [usernameInput, setUsernameInput] = useState("");
+  const [username, setUsername] = useState(() => {
+    return localStorage.getItem("username") || "";
+  });
+
+  // 🆔 user unique local
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
 
@@ -39,11 +49,6 @@ export default function App() {
   // 👆 SWIPE STATE
   // =========================
   const [swipeX, setSwipeX] = useState({});
-
-  // =========================
-  // ⚠️ MODAL DELETE STATE
-  // =========================
-  const [trackToDelete, setTrackToDelete] = useState(null);
 
   // =========================
   // 🔥 FIREBASE
@@ -68,57 +73,18 @@ export default function App() {
   }, []);
 
   // =========================
-  // 👆 SWIPE START
+  // 👤 VALIDATION USERNAME
   // =========================
-  const handleTouchStart = (e, id) => {
-    const startX = e.touches[0].clientX;
+  const handleLogin = () => {
+    if (!usernameInput.trim()) return;
 
-    setSwipeX((prev) => ({
-      ...prev,
-      [id]: { startX, moveX: 0 },
-    }));
+    setUsername(usernameInput);
+    localStorage.setItem("username", usernameInput);
+    setUsernameInput("");
   };
 
   // =========================
-  // 👉 SWIPE MOVE
-  // =========================
-  const handleTouchMove = (e, id) => {
-    const moveX = e.touches[0].clientX;
-
-    setSwipeX((prev) => {
-      const item = prev[id];
-      if (!item) return prev;
-
-      return {
-        ...prev,
-        [id]: {
-          ...item,
-          moveX: moveX - item.startX,
-        },
-      };
-    });
-  };
-
-  // =========================
-  // ✋ SWIPE END
-  // =========================
-  const handleTouchEnd = (id) => {
-    const item = swipeX[id];
-    if (!item) return;
-
-    // 🔥 swipe suffisant → on ouvre la modal
-    if (item.moveX < -80) {
-      setTrackToDelete(id);
-    }
-
-    setSwipeX((prev) => ({
-      ...prev,
-      [id]: { startX: 0, moveX: 0 },
-    }));
-  };
-
-  // =========================
-  // ➕ ADD TRACK
+  // ➕ AJOUT MUSIQUE
   // =========================
   const addTrack = async () => {
     if (!title.trim()) return;
@@ -136,42 +102,91 @@ export default function App() {
   };
 
   // =========================
-  // ❌ DELETE TRACK
+  // ❌ SUPPRESSION
   // =========================
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
   // =========================
-  // 👍 VOTE TOGGLE
+  // 👍 VOTE AVEC IDENTITÉ
   // =========================
   const handleVote = async (track) => {
+
+    // 🚫 sécurité : pas connecté = pas de vote
+    if (!username) return;
+
     const trackRef = doc(db, "tracks", track.id);
 
-    const alreadyVoted = track.votedBy?.includes(userId);
+    const alreadyVoted = track.votedBy?.some(
+      (v) => v.id === userId
+    );
 
+    // ❌ retirer vote
     if (alreadyVoted) {
       await updateDoc(trackRef, {
         votes: Math.max((track.votes || 1) - 1, 0),
-        votedBy: (track.votedBy || []).filter((id) => id !== userId),
+        votedBy: (track.votedBy || []).filter(
+          (v) => v.id !== userId
+        ),
       });
       return;
     }
 
+    // 👍 ajouter vote avec identité
     await updateDoc(trackRef, {
       votes: (track.votes || 0) + 1,
-      votedBy: [...(track.votedBy || []), userId],
+      votedBy: [
+        ...(track.votedBy || []),
+        {
+          id: userId,
+          name: username
+        }
+      ],
     });
   };
 
   // =========================
-  // 🧠 CONFIRM DELETE
+  // 👆 SWIPE DELETE
   // =========================
-  const confirmDelete = async () => {
-    if (!trackToDelete) return;
+  const handleTouchStart = (e, id) => {
+    const startX = e.touches[0].clientX;
 
-    await removeTrack(trackToDelete);
-    setTrackToDelete(null);
+    setSwipeX((prev) => ({
+      ...prev,
+      [id]: { startX, moveX: 0 },
+    }));
+  };
+
+  const handleTouchMove = (e, id) => {
+    const moveX = e.touches[0].clientX;
+
+    setSwipeX((prev) => {
+      const item = prev[id];
+      if (!item) return prev;
+
+      return {
+        ...prev,
+        [id]: {
+          ...item,
+          moveX: moveX - item.startX,
+        },
+      };
+    });
+  };
+
+  const handleTouchEnd = (id) => {
+    const item = swipeX[id];
+    if (!item) return;
+
+    if (item.moveX < -80) {
+      removeTrack(id);
+    }
+
+    setSwipeX((prev) => ({
+      ...prev,
+      [id]: { startX: 0, moveX: 0 },
+    }));
   };
 
   // =========================
@@ -180,15 +195,40 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
+
         <h1 style={styles.title}>🎵 PLAYLIST</h1>
 
-        {/* INPUTS */}
+        {/* =========================
+            👤 LOGIN BLOCK
+        ========================= */}
+        {!username ? (
+          <div style={styles.loginBox}>
+            <input
+              style={styles.input}
+              placeholder="Ton nom"
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+            />
+
+            <button style={styles.button} onClick={handleLogin}>
+              Valider
+            </button>
+          </div>
+        ) : (
+          <div style={styles.loggedAs}>
+            👤 Connecté en tant que <b>{username}</b>
+          </div>
+        )}
+
+        {/* =========================
+            📝 ADD TRACK
+        ========================= */}
         <div style={styles.inputCol}>
           <input
             style={styles.input}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Titre du son"
+            placeholder="Titre"
           />
 
           <input
@@ -203,11 +243,15 @@ export default function App() {
           </button>
         </div>
 
-        {/* LIST */}
+        {/* =========================
+            📋 LIST
+        ========================= */}
         <div style={styles.list}>
           {tracks.map((item) => {
 
-            const hasVoted = item.votedBy?.includes(userId);
+            const hasVoted = item.votedBy?.some(
+              (v) => v.id === userId
+            );
 
             return (
               <div
@@ -228,59 +272,40 @@ export default function App() {
                   <span>{item.votes || 0}</span>
                 </div>
 
-                {/* CONTENT */}
+                {/* CONTENU */}
                 <div style={styles.item}>
                   <div>
                     <div style={styles.titleText}>{item.title}</div>
                     <div style={styles.artistText}>{item.artist}</div>
+
+                    {/* 👥 QUI A VOTÉ */}
+                    {item.votedBy?.length > 0 && (
+                      <div style={styles.voters}>
+                        {item.votedBy.map((v) => v.name).join(", ")}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* VOTE BUTTON */}
-                <button
-                  style={{
-                    ...styles.voteButton,
-                    background: hasVoted ? "#ef4444" : "#2563eb",
-                  }}
-                  onClick={() => handleVote(item)}
-                >
-                  {hasVoted ? "Annuler vote" : "Voter"}
-                </button>
+                {/* 👍 BOUTON VOTE (UNIQUEMENT SI CONNECTÉ) */}
+                {username && (
+                  <button
+                    style={{
+                      ...styles.voteButton,
+                      background: hasVoted ? "#ef4444" : "#2563eb",
+                    }}
+                    onClick={() => handleVote(item)}
+                  >
+                    {hasVoted ? "Annuler vote" : "Voter"}
+                  </button>
+                )}
 
               </div>
             );
           })}
         </div>
+
       </div>
-
-      {/* =========================
-          ⚠️ MODAL CONFIRM DELETE
-      ========================= */}
-      {trackToDelete && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-
-            <p>❌ Supprimer cette musique ?</p>
-
-            <div style={styles.modalActions}>
-              <button
-                style={styles.cancelBtn}
-                onClick={() => setTrackToDelete(null)}
-              >
-                Annuler
-              </button>
-
-              <button
-                style={styles.deleteBtn}
-                onClick={confirmDelete}
-              >
-                Supprimer
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -309,6 +334,18 @@ const styles = {
   },
 
   title: { marginBottom: 20 },
+
+  loginBox: {
+    display: "flex",
+    gap: 10,
+    marginBottom: 15,
+  },
+
+  loggedAs: {
+    fontSize: 12,
+    marginBottom: 10,
+    color: "#555",
+  },
 
   inputCol: {
     display: "flex",
@@ -367,47 +404,9 @@ const styles = {
     cursor: "pointer",
   },
 
-  /* =========================
-     MODAL STYLE
-  ========================= */
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0,0,0,0.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  modal: {
-    background: "white",
-    padding: 20,
-    borderRadius: 12,
-    textAlign: "center",
-    width: 260,
-  },
-
-  modalActions: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginTop: 12,
-  },
-
-  cancelBtn: {
-    padding: 8,
-    border: "none",
-    background: "#ddd",
-    borderRadius: 8,
-  },
-
-  deleteBtn: {
-    padding: 8,
-    border: "none",
-    background: "#ef4444",
-    color: "white",
-    borderRadius: 8,
+  voters: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 4,
   },
 };
