@@ -190,22 +190,37 @@ const styles = {
     alignItems: "center",
     background: "#f1f5f9",
     fontFamily: "Arial",
-    padding: 20,
+    padding: 12, // 🔥 réduit pour mobile
   },
 
-  card: {
-    width: "100%",
-    maxWidth: 520,
-    background: "white",
-    borderRadius: 16,
-    padding: 24,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-  },
+card: {
+  width: "100%",
+  maxWidth: 420,
+  background: "white",
+  borderRadius: 16,
+  padding: 16,
+  boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+},
 
   title: {
     marginBottom: 20,
   },
 
+  titleText: {
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  
+  artistText: {
+    fontSize: 11,
+    color: "#666",
+  },
+
+  votes: {
+    fontWeight: "bold",
+    fontSize: 13,
+  },
+  
   inputCol: {
     display: "flex",
     flexDirection: "column",
@@ -235,12 +250,21 @@ const styles = {
   },
 
   item: {
+    flex: 1,
     display: "flex",
     justifyContent: "space-between",
-    padding: 12,
+    alignItems: "center",
+    padding: 10,
     border: "1px solid #eee",
     borderRadius: 10,
     background: "#fafafa",
+  },
+
+  itemRow: {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  marginBottom: 6,
   },
 
   delete: {
@@ -248,6 +272,8 @@ const styles = {
     background: "transparent",
     color: "red",
     cursor: "pointer",
+    fontSize: 16,
+    padding: 4,
   },
 
   empty: {
