@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
 
+// 🔌 Import des fonctions Firebase (Firestore)
 import {
   collection,
   addDoc,
@@ -12,16 +13,41 @@ import {
 } from "firebase/firestore";
 
 export default function App() {
+
+  // =========================
+  // 🎯 STATES (données React)
+  // =========================
+
+  // 📝 Input titre
   const [title, setTitle] = useState("");
+
+  // 🧑‍🎤 Input artiste
   const [artist, setArtist] = useState("");
+
+  // 📦 Liste des musiques récupérées depuis Firebase
   const [tracks, setTracks] = useState([]);
 
+
+  // =========================
+  // 🔥 FIREBASE CONFIG
+  // =========================
+
+  // 📁 Référence à la collection "tracks" dans Firebase
   const colRef = collection(db, "tracks");
+
+  // 📊 Requête : tri par date de création (du plus récent au plus ancien)
   const q = query(colRef, orderBy("createdAt", "desc"));
 
-  // 📡 écoute temps réel
+
+  // =========================
+  // 📡 ÉCOUTE TEMPS RÉEL
+  // =========================
+
   useEffect(() => {
+    // 🔁 on écoute en temps réel les changements dans Firestore
     const unsub = onSnapshot(q, (snapshot) => {
+
+      // 🔄 transformation des données Firebase → format utilisable
       setTracks(
         snapshot.docs.map((doc) => ({
           id: doc.id,
@@ -30,36 +56,57 @@ export default function App() {
       );
     });
 
+    // 🧹 nettoyage du listener quand le composant se démonte
     return () => unsub();
   }, []);
 
-  // ➕ ajouter un son
+
+  // =========================
+  // ➕ FONCTION AJOUTER UN SON
+  // =========================
+
   const addTrack = async () => {
+
+    // 🚫 Empêche d’ajouter un champ vide
     if (!title.trim()) return;
 
+    // 📥 Ajout dans Firebase
     await addDoc(colRef, {
-      title,
-      artist: artist || "Unknown",
-      createdAt: Date.now(),
-      votes: 0,
-      votedBy: [],
+      title,                       // 🎵 titre du morceau
+      artist: artist || "Unknown", // 🧑‍🎤 artiste (fallback)
+      createdAt: Date.now(),       // ⏱️ date de création
+      votes: 0,                    // 👍 compteur de votes (prévu pour plus tard)
+      votedBy: [],                 // 👤 liste des utilisateurs ayant voté
     });
 
+    // 🔄 Reset des inputs après ajout
     setTitle("");
     setArtist("");
   };
 
-  // ❌ supprimer
+
+  // =========================
+  // ❌ FONCTION SUPPRIMER UN SON
+  // =========================
+
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
+
+
+  // =========================
+  // 🎨 INTERFACE UTILISATEUR (UI)
+  // =========================
 
   return (
     <div style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.title}>🎵 Music Queue</h1>
 
-        {/* INPUTS */}
+        {/* =========================
+            📝 INPUTS UTILISATEUR
+        ========================= */}
+
         <div style={styles.inputCol}>
           <input
             style={styles.input}
@@ -80,33 +127,45 @@ export default function App() {
           </button>
         </div>
 
-        {/* LISTE */}
+        {/* =========================
+            📋 LISTE DES MUSIQUES
+        ========================= */}
+
         <div style={styles.list}>
           {tracks.length === 0 ? (
             <div style={styles.empty}>Aucun morceau</div>
           ) : (
             tracks.map((item, index) => (
               <div key={item.id} style={styles.item}>
+
+                {/* 🎵 Infos musique */}
                 <span>
                   {index + 1}. {item.title} - {item.artist || "Unknown"}
                 </span>
 
+                {/* ❌ Bouton suppression */}
                 <button
                   style={styles.delete}
                   onClick={() => removeTrack(item.id)}
                 >
                   ✕
                 </button>
+
               </div>
             ))
           )}
         </div>
+
       </div>
     </div>
   );
 }
 
-/* 🎨 STYLES */
+
+// =========================
+// 🎨 STYLES
+// =========================
+
 const styles = {
   page: {
     minHeight: "100vh",
