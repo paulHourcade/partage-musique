@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
 
-// 🔌 Firestore
 import {
   collection,
   addDoc,
@@ -40,6 +39,11 @@ export default function App() {
   // 👆 SWIPE STATE
   // =========================
   const [swipeX, setSwipeX] = useState({});
+
+  // =========================
+  // ⚠️ MODAL DELETE STATE
+  // =========================
+  const [trackToDelete, setTrackToDelete] = useState(null);
 
   // =========================
   // 🔥 FIREBASE
@@ -102,8 +106,9 @@ export default function App() {
     const item = swipeX[id];
     if (!item) return;
 
+    // 🔥 swipe suffisant → on ouvre la modal
     if (item.moveX < -80) {
-      removeTrack(id);
+      setTrackToDelete(id);
     }
 
     setSwipeX((prev) => ({
@@ -138,32 +143,35 @@ export default function App() {
   };
 
   // =========================
-  // 👍 TOGGLE VOTE (VOTE / UNVOTE)
+  // 👍 VOTE TOGGLE
   // =========================
   const handleVote = async (track) => {
     const trackRef = doc(db, "tracks", track.id);
 
     const alreadyVoted = track.votedBy?.includes(userId);
 
-    // =========================
-    // ❌ RETRAIT DU VOTE
-    // =========================
     if (alreadyVoted) {
       await updateDoc(trackRef, {
         votes: Math.max((track.votes || 1) - 1, 0),
         votedBy: (track.votedBy || []).filter((id) => id !== userId),
       });
-
       return;
     }
 
-    // =========================
-    // 👍 AJOUT DU VOTE
-    // =========================
     await updateDoc(trackRef, {
       votes: (track.votes || 0) + 1,
       votedBy: [...(track.votedBy || []), userId],
     });
+  };
+
+  // =========================
+  // 🧠 CONFIRM DELETE
+  // =========================
+  const confirmDelete = async () => {
+    if (!trackToDelete) return;
+
+    await removeTrack(trackToDelete);
+    setTrackToDelete(null);
   };
 
   // =========================
@@ -228,7 +236,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* VOTE BUTTON TOGGLE */}
+                {/* VOTE BUTTON */}
                 <button
                   style={{
                     ...styles.voteButton,
@@ -243,8 +251,36 @@ export default function App() {
             );
           })}
         </div>
-
       </div>
+
+      {/* =========================
+          ⚠️ MODAL CONFIRM DELETE
+      ========================= */}
+      {trackToDelete && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+
+            <p>❌ Supprimer cette musique ?</p>
+
+            <div style={styles.modalActions}>
+              <button
+                style={styles.cancelBtn}
+                onClick={() => setTrackToDelete(null)}
+              >
+                Annuler
+              </button>
+
+              <button
+                style={styles.deleteBtn}
+                onClick={confirmDelete}
+              >
+                Supprimer
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -329,5 +365,49 @@ const styles = {
     borderRadius: 8,
     fontSize: 12,
     cursor: "pointer",
+  },
+
+  /* =========================
+     MODAL STYLE
+  ========================= */
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modal: {
+    background: "white",
+    padding: 20,
+    borderRadius: 12,
+    textAlign: "center",
+    width: 260,
+  },
+
+  modalActions: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: 12,
+  },
+
+  cancelBtn: {
+    padding: 8,
+    border: "none",
+    background: "#ddd",
+    borderRadius: 8,
+  },
+
+  deleteBtn: {
+    padding: 8,
+    border: "none",
+    background: "#ef4444",
+    color: "white",
+    borderRadius: 8,
   },
 };
