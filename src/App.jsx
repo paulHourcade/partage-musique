@@ -18,48 +18,54 @@ export default function App() {
   // =========================
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+
   const [tracks, setTracks] = useState([]);
 
   // =========================
   // 🎧 SPOTIFY CONFIG
   // =========================
   const CLIENT_ID = "TON_CLIENT_ID";
+  const CLIENT_SECRET = "TON_CLIENT_SECRET"; // ⚠️ nécessaire
 
-  const searchSpotifyTrack = async (title, artist) => {
+  const getSpotifyToken = async () => {
+    const res = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(CLIENT_ID + ":" + CLIENT_SECRET),
+      },
+      body: "grant_type=client_credentials",
+    });
+
+    const data = await res.json();
+    return data.access_token;
+  };
+
+  const searchSpotify = async (query) => {
+    if (!query.trim()) return;
+
     try {
-      const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: "Basic " + btoa(CLIENT_ID + ":"),
-        },
-        body: "grant_type=client_credentials",
-      });
+      const token = await getSpotifyToken();
 
-      const tokenData = await tokenRes.json();
-      const accessToken = tokenData.access_token;
-
-      const searchRes = await fetch(
-        `https://api.spotify.com/v1/search?q=${title} ${artist}&type=track&limit=1`,
+      const res = await fetch(
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(
+          query
+        )}&type=track&limit=5`,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
 
-      const data = await searchRes.json();
-      return data.tracks.items[0]?.id || null;
+      const data = await res.json();
+      setSearchResults(data.tracks.items || []);
     } catch (err) {
-      console.log("Erreur Spotify:", err);
-      return null;
+      console.log("Spotify error:", err);
     }
   };
-
-  // =========================
-  // 🎬 ANIMATIONS
-  // =========================
-  const [animVotes, setAnimVotes] = useState({});
 
   // =========================
   // 👤 AUTH
@@ -98,27 +104,15 @@ export default function App() {
   }, []);
 
   // =========================
-  // 👤 LOGIN
-  // =========================
-  const handleLogin = () => {
-    if (!usernameInput.trim()) return;
-    setUsername(usernameInput);
-    localStorage.setItem("username", usernameInput);
-    setUsernameInput("");
-  };
-
-  // =========================
   // ➕ ADD TRACK
   // =========================
   const addTrack = async () => {
     if (!title.trim()) return;
 
-    const spotifyId = await searchSpotifyTrack(title, artist);
-
     await addDoc(colRef, {
       title,
       artist: artist || "Unknown",
-      spotifyId: spotifyId || null,
+      spotifyId: null,
       createdAt: Date.now(),
       votes: 0,
       votedBy: [],
@@ -129,15 +123,20 @@ export default function App() {
   };
 
   // =========================
+  // 🎯 SELECT SPOTIFY TRACK
+  // =========================
+  const selectTrack = (track) => {
+    setTitle(track.name);
+    setArtist(track.artists?.[0]?.name || "");
+    setSearchResults([]);
+    setSearchQuery("");
+  };
+
+  // =========================
   // 👍 VOTE
   // =========================
   const handleVote = async (track) => {
     if (!username) return;
-
-    setAnimVotes((prev) => ({ ...prev, [track.id]: true }));
-    setTimeout(() => {
-      setAnimVotes((prev) => ({ ...prev, [track.id]: false }));
-    }, 200);
 
     const trackRef = doc(db, "tracks", track.id);
 
@@ -163,34 +162,45 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        {/* LOGIN */}
-        <div style={styles.topBar}>
-          {!username ? (
-            <div style={styles.loginBox}>
-              <input
-                style={styles.input}
-                placeholder="Ton nom"
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value)}
-              />
-              <button style={styles.button} onClick={handleLogin}>
-                Valider
-              </button>
+        <h1 style={styles.title}>🎵 PLAYLIST</h1>
+
+        {/* 🔎 SPOTIFY SEARCH */}
+        <div style={styles.inputCol}>
+          <input
+            style={styles.input}
+            placeholder="Rechercher sur Spotify..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              searchSpotify(e.target.value);
+            }}
+          />
+
+          {searchResults.length > 0 && (
+            <div style={styles.results}>
+              {searchResults.map((t) => (
+                <div
+                  key={t.id}
+                  style={styles.resultItem}
+                  onClick={() => selectTrack(t)}
+                >
+                  <div style={{ fontWeight: "bold" }}>{t.name}</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    {t.artists?.[0]?.name}
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : (
-            <div>👤 {username}</div>
           )}
         </div>
 
-        <h1 style={styles.title}>🎵 PLAYLIST</h1>
-
-        {/* INPUTS */}
+        {/* ➕ ADD TRACK */}
         <div style={styles.inputCol}>
           <input
             style={styles.input}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Titre du son"
+            placeholder="Titre"
           />
 
           <input
@@ -212,19 +222,6 @@ export default function App() {
 
             return (
               <div key={item.id} style={styles.itemRow}>
-                {/* VOTES */}
-                <div
-                  style={{
-                    ...styles.voteBox,
-                    transform: animVotes[item.id]
-                      ? "scale(1.3)"
-                      : "scale(1)",
-                  }}
-                >
-                  👍 {item.votes || 0}
-                </div>
-
-                {/* TRACK */}
                 <div style={styles.item}>
                   <div style={styles.titleText}>{item.title}</div>
                   <div style={styles.artistText}>{item.artist}</div>
@@ -236,12 +233,11 @@ export default function App() {
                       rel="noreferrer"
                       style={{ fontSize: 12, color: "#1DB954" }}
                     >
-                      ▶ Écouter sur Spotify
+                      ▶ Spotify
                     </a>
                   )}
                 </div>
 
-                {/* VOTE BUTTON */}
                 {username && (
                   <button
                     style={{
@@ -270,26 +266,14 @@ const styles = {
     minHeight: "100vh",
     display: "flex",
     justifyContent: "center",
-    alignItems: "flex-start",
     background: "#f1f5f9",
-    fontFamily: "Arial",
     padding: 12,
+    fontFamily: "Arial",
   },
 
   card: {
     width: "100%",
     maxWidth: 420,
-  },
-
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-
-  loginBox: {
-    display: "flex",
-    gap: 8,
   },
 
   title: {
@@ -301,7 +285,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 16,
   },
 
   input: {
@@ -327,17 +311,10 @@ const styles = {
 
   itemRow: {
     display: "flex",
-    alignItems: "center",
-    gap: 10,
+    justifyContent: "space-between",
     background: "white",
     padding: 10,
     borderRadius: 10,
-  },
-
-  voteBox: {
-    minWidth: 60,
-    textAlign: "center",
-    cursor: "pointer",
   },
 
   item: {
@@ -359,5 +336,19 @@ const styles = {
     border: "none",
     color: "white",
     cursor: "pointer",
+  },
+
+  results: {
+    background: "white",
+    borderRadius: 8,
+    border: "1px solid #ddd",
+    maxHeight: 200,
+    overflowY: "auto",
+  },
+
+  resultItem: {
+    padding: 10,
+    cursor: "pointer",
+    borderBottom: "1px solid #eee",
   },
 };
