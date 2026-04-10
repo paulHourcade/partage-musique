@@ -189,37 +189,37 @@ export default function App() {
         ========================= */}
         <div style={styles.list}>
           {tracks.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                ...styles.itemRow,
-                transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
-                transition: "transform 0.2s",
-              }}
-              onTouchStart={(e) => handleTouchStart(e, item.id)}
-              onTouchMove={(e) => handleTouchMove(e, item.id)}
-              onTouchEnd={() => handleTouchEnd(item.id)}
-            >
 
-              <button
-                style={styles.delete}
-                onClick={() => setTrackToDelete(item.id)}
-              >
-                ✕
-              </button>
-
-              <div style={styles.item}>
-                <div>
-                  <div style={styles.titleText}>{item.title}</div>
-                  <div style={styles.artistText}>{item.artist}</div>
-                </div>
-
-                <div style={styles.votes}>
-                  👍 {item.votes || 0}
-                </div>
-              </div>
-
+        <div
+          key={item.id}
+          style={{
+            ...styles.itemRow,
+            transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
+            transition: "transform 0.2s",
+          }}
+          onTouchStart={(e) => handleTouchStart(e, item.id)}
+          onTouchMove={(e) => handleTouchMove(e, item.id)}
+          onTouchEnd={() => handleTouchEnd(item.id)}
+        >
+        
+          {/* 👍 VOTES À GAUCHE (remplace la croix) */}
+          <div style={styles.voteBox}>
+            <span style={styles.voteIcon}>👍</span>
+            <span style={styles.voteCount}>{item.votes || 0}</span>
+          </div>
+        
+          {/* 🎵 CONTENU PRINCIPAL */}
+          <div style={styles.item}>
+            <div>
+              <div style={styles.titleText}>{item.title}</div>
+              <div style={styles.artistText}>{item.artist}</div>
             </div>
+          </div>
+        
+        </div>
+
+
+
           ))}
         </div>
       </div>
