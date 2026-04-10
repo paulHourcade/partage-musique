@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
+
 import {
   collection,
   addDoc,
@@ -21,17 +22,13 @@ export default function App() {
   const [tracks, setTracks] = useState([]);
 
   // =========================
-  // 👤 AUTH SIMPLE (AJOUTÉ)
+  // 👤 AUTH
   // =========================
   const [usernameInput, setUsernameInput] = useState("");
-
   const [username, setUsername] = useState(() => {
     return localStorage.getItem("username") || "";
   });
 
-  // =========================
-  // 🆔 USER ID LOCAL
-  // =========================
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
 
@@ -44,14 +41,19 @@ export default function App() {
   });
 
   // =========================
-  // 👆 SWIPE STATE
+  // 👆 SWIPE
   // =========================
   const [swipeX, setSwipeX] = useState({});
 
   // =========================
-  // ⚠️ MODAL DELETE STATE
+  // ⚠️ DELETE MODAL
   // =========================
   const [trackToDelete, setTrackToDelete] = useState(null);
+
+  // =========================
+  // 👀 VOTE MODAL (NEW)
+  // =========================
+  const [selectedTrack, setSelectedTrack] = useState(null);
 
   // =========================
   // 🔥 FIREBASE
@@ -60,7 +62,7 @@ export default function App() {
   const q = query(colRef, orderBy("createdAt", "desc"));
 
   // =========================
-  // 📡 REALTIME LISTENER
+  // 📡 REALTIME
   // =========================
   useEffect(() => {
     const unsub = onSnapshot(q, (snapshot) => {
@@ -76,7 +78,7 @@ export default function App() {
   }, []);
 
   // =========================
-  // 👤 LOGIN FUNCTION
+  // 👤 LOGIN
   // =========================
   const handleLogin = () => {
     if (!usernameInput.trim()) return;
@@ -105,18 +107,16 @@ export default function App() {
   };
 
   // =========================
-  // ❌ DELETE TRACK
+  // ❌ DELETE
   // =========================
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
   // =========================
-  // 👍 VOTE TOGGLE (AVEC AUTH)
+  // 👍 VOTE
   // =========================
   const handleVote = async (track) => {
-
-    // 🚫 si pas connecté → pas de vote
     if (!username) return;
 
     const trackRef = doc(db, "tracks", track.id);
@@ -125,7 +125,6 @@ export default function App() {
       (v) => v.id === userId
     );
 
-    // ❌ retirer vote
     if (alreadyVoted) {
       await updateDoc(trackRef, {
         votes: Math.max((track.votes || 1) - 1, 0),
@@ -136,21 +135,17 @@ export default function App() {
       return;
     }
 
-    // 👍 ajouter vote
     await updateDoc(trackRef, {
       votes: (track.votes || 0) + 1,
       votedBy: [
         ...(track.votedBy || []),
-        {
-          id: userId,
-          name: username
-        }
+        { id: userId, name: username }
       ],
     });
   };
 
   // =========================
-  // 👆 SWIPE START
+  // 👆 SWIPE
   // =========================
   const handleTouchStart = (e, id) => {
     const startX = e.touches[0].clientX;
@@ -161,9 +156,6 @@ export default function App() {
     }));
   };
 
-  // =========================
-  // 👉 SWIPE MOVE
-  // =========================
   const handleTouchMove = (e, id) => {
     const moveX = e.touches[0].clientX;
 
@@ -181,9 +173,6 @@ export default function App() {
     });
   };
 
-  // =========================
-  // ✋ SWIPE END
-  // =========================
   const handleTouchEnd = (id) => {
     const item = swipeX[id];
     if (!item) return;
@@ -215,11 +204,8 @@ export default function App() {
     <div style={styles.page}>
       <div style={styles.card}>
 
-        {/* =========================
-            👤 LOGIN TOUT EN HAUT
-        ========================= */}
+        {/* LOGIN */}
         <div style={styles.topBar}>
-
           {!username ? (
             <div style={styles.loginBox}>
               <input
@@ -228,27 +214,20 @@ export default function App() {
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
               />
-
               <button style={styles.button} onClick={handleLogin}>
                 Valider
               </button>
             </div>
           ) : (
             <div style={styles.loggedAs}>
-              👤 Connecté en tant que <b>{username}</b>
+              👤 {username}
             </div>
           )}
-
         </div>
 
-        {/* =========================
-            TITRE
-        ========================= */}
         <h1 style={styles.title}>🎵 PLAYLIST</h1>
 
-        {/* =========================
-            INPUTS
-        ========================= */}
+        {/* INPUTS */}
         <div style={styles.inputCol}>
           <input
             style={styles.input}
@@ -269,9 +248,7 @@ export default function App() {
           </button>
         </div>
 
-        {/* =========================
-            LISTE
-        ========================= */}
+        {/* LIST */}
         <div style={styles.list}>
           {tracks.map((item) => {
 
@@ -292,10 +269,15 @@ export default function App() {
                 onTouchEnd={() => handleTouchEnd(item.id)}
               >
 
-                {/* VOTES */}
-                <div style={styles.voteBox}>
+                {/* 👍 VOTES CLIQUABLES */}
+                <div
+                  style={styles.voteBox}
+                  onClick={() => setSelectedTrack(item)}
+                >
                   <span>👍</span>
-                  <span>{item.votes || 0}</span>
+                  <span style={{ cursor: "pointer" }}>
+                    {item.votes || 0}
+                  </span>
                 </div>
 
                 {/* TRACK */}
@@ -306,7 +288,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* VOTE BUTTON (SI CONNECTÉ) */}
+                {/* VOTE BUTTON */}
                 {username && (
                   <button
                     style={{
@@ -327,29 +309,42 @@ export default function App() {
       </div>
 
       {/* =========================
-          MODAL DELETE
+          ❌ DELETE MODAL
       ========================= */}
       {trackToDelete && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
+            <p>Supprimer cette musique ?</p>
+            <button onClick={() => setTrackToDelete(null)}>Annuler</button>
+            <button onClick={confirmDelete}>Supprimer</button>
+          </div>
+        </div>
+      )}
 
-            <p>❌ Supprimer cette musique ?</p>
+      {/* =========================
+          👀 VOTE MODAL (NEW)
+      ========================= */}
+      {selectedTrack && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
 
-            <div style={styles.modalActions}>
-              <button
-                style={styles.cancelBtn}
-                onClick={() => setTrackToDelete(null)}
-              >
-                Annuler
-              </button>
+            {/* fermeture */}
+            <button
+              style={{ float: "right" }}
+              onClick={() => setSelectedTrack(null)}
+            >
+              ✕
+            </button>
 
-              <button
-                style={styles.deleteBtn}
-                onClick={confirmDelete}
-              >
-                Supprimer
-              </button>
-            </div>
+            <h3>Votes</h3>
+
+            {selectedTrack.votedBy?.length > 0 ? (
+              selectedTrack.votedBy.map((v, i) => (
+                <div key={i}>👤 {v.name}</div>
+              ))
+            ) : (
+              <div>Aucun vote</div>
+            )}
 
           </div>
         </div>
@@ -359,9 +354,7 @@ export default function App() {
   );
 }
 
-/* =========================
-🎨 STYLES (inchangés)
-========================= */
+/* styles inchangés sauf ajout click cursor si besoin */
 const styles = {
 
   page: {
@@ -382,14 +375,8 @@ const styles = {
     padding: 16,
   },
 
-  topBar: {
-    marginBottom: 10,
-  },
-
-  loginBox: {
-    display: "flex",
-    gap: 10,
-  },
+  topBar: { marginBottom: 10 },
+  loginBox: { display: "flex", gap: 10 },
 
   loggedAs: {
     fontSize: 12,
@@ -444,6 +431,7 @@ const styles = {
   voteBox: {
     width: 40,
     textAlign: "center",
+    cursor: "pointer",
   },
 
   voteButton: {
@@ -471,28 +459,6 @@ const styles = {
     background: "white",
     padding: 20,
     borderRadius: 12,
-    textAlign: "center",
     width: 260,
-  },
-
-  modalActions: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginTop: 12,
-  },
-
-  cancelBtn: {
-    padding: 8,
-    border: "none",
-    background: "#ddd",
-    borderRadius: 8,
-  },
-
-  deleteBtn: {
-    padding: 8,
-    border: "none",
-    background: "#ef4444",
-    color: "white",
-    borderRadius: 8,
   },
 };
