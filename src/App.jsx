@@ -10,7 +10,7 @@ import {
   onSnapshot,
   orderBy,
   query,
-  updateDoc,
+  updateDoc, // ⭐ AJOUT POUR LE VOTE
 } from "firebase/firestore";
 
 export default function App() {
@@ -28,12 +28,7 @@ export default function App() {
   const [swipeX, setSwipeX] = useState({});
 
   // =========================
-  // ⚠️ MODAL DELETE STATE (NEW)
-  // =========================
-  const [trackToDelete, setTrackToDelete] = useState(null);
-
-  // =========================
-  // 🔥 FIREBASE
+  // 🔥 FIREBASE CONFIG
   // =========================
   const colRef = collection(db, "tracks");
   const q = query(colRef, orderBy("createdAt", "desc"));
@@ -56,17 +51,6 @@ export default function App() {
 
   // =========================
   // 👆 SWIPE START
-
-    /*Swipe → détecté
-          ↓
-    seuil dépassé ?
-          ↓
-    popup confirmation
-          ↓
-    oui → delete
-    non → annule
-  */
-  
   // =========================
   const handleTouchStart = (e, id) => {
     const startX = e.touches[0].clientX;
@@ -104,13 +88,10 @@ export default function App() {
     const item = swipeX[id];
     if (!item) return;
 
-    // 🔥 si swipe suffisant vers la gauche
     if (item.moveX < -80) {
-      // ⚠️ on ouvre la modal au lieu de supprimer direct
-      setTrackToDelete(id);
+      removeTrack(id);
     }
 
-    // 🔄 reset swipe visuel
     setSwipeX((prev) => ({
       ...prev,
       [id]: { startX: 0, moveX: 0 },
@@ -118,7 +99,7 @@ export default function App() {
   };
 
   // =========================
-  // ➕ ADD TRACK
+  // ➕ AJOUT MUSIQUE
   // =========================
   const addTrack = async () => {
     if (!title.trim()) return;
@@ -136,22 +117,21 @@ export default function App() {
   };
 
   // =========================
-  // ❌ DELETE TRACK (FIREBASE)
+  // ❌ SUPPRESSION
   // =========================
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
   // =========================
-  // 🧠 CONFIRM DELETE ACTION
+  // 👍 VOTE (NEW)
   // =========================
-  const confirmDelete = async () => {
-    if (!trackToDelete) return;
+  const handleVote = async (id, currentVotes) => {
+    const trackRef = doc(db, "tracks", id);
 
-    await removeTrack(trackToDelete);
-
-    // fermeture modal
-    setTrackToDelete(null);
+    await updateDoc(trackRef, {
+      votes: (currentVotes || 0) + 1,
+    });
   };
 
   // =========================
@@ -190,106 +170,45 @@ export default function App() {
         ========================= */}
         <div style={styles.list}>
           {tracks.map((item) => (
-
-          <div
-            key={item.id}
-            style={{
-              ...styles.itemRow,
-              transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
-              transition: "transform 0.2s",
-            }}
-            onTouchStart={(e) => handleTouchStart(e, item.id)}
-            onTouchMove={(e) => handleTouchMove(e, item.id)}
-            onTouchEnd={() => handleTouchEnd(item.id)}
-          >
-          
-            {/* 👍 VOTES (VISUEL) */}
-            <div style={styles.voteBox}>
-              <span style={styles.voteIcon}>👍</span>
-              <span style={styles.voteCount}>{item.votes || 0}</span>
-            </div>
-          
-            {/* 🎵 CONTENU */}
-            <div style={styles.item}>
-              <div>
-                <div style={styles.titleText}>{item.title}</div>
-                <div style={styles.artistText}>{item.artist}</div>
-              </div>
-            </div>
-          
-            {/* 🟢 BOUTON VOTE */}
-            <button
-              style={styles.voteButton}
-              onClick={() => handleVote(item.id, item.votes)}
+            <div
+              key={item.id}
+              style={{
+                ...styles.itemRow,
+                transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
+                transition: "transform 0.2s",
+              }}
+              onTouchStart={(e) => handleTouchStart(e, item.id)}
+              onTouchMove={(e) => handleTouchMove(e, item.id)}
+              onTouchEnd={() => handleTouchEnd(item.id)}
             >
-              Voter
-            </button>
-          
-          </div>
 
+              {/* 👍 VOTES VISUELS */}
+              <div style={styles.voteBox}>
+                <span style={styles.voteIcon}>👍</span>
+                <span style={styles.voteCount}>{item.votes || 0}</span>
+              </div>
 
-        <div
-          key={item.id}
-          style={{
-            ...styles.itemRow,
-            transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
-            transition: "transform 0.2s",
-          }}
-          onTouchStart={(e) => handleTouchStart(e, item.id)}
-          onTouchMove={(e) => handleTouchMove(e, item.id)}
-          onTouchEnd={() => handleTouchEnd(item.id)}
-        >
-        
-          {/* 👍 VOTES À GAUCHE (remplace la croix) */}
-          <div style={styles.voteBox}>
-            <span style={styles.voteIcon}>👍</span>
-            <span style={styles.voteCount}>{item.votes || 0}</span>
-          </div>
-        
-          {/* 🎵 CONTENU PRINCIPAL */}
-          <div style={styles.item}>
-            <div>
-              <div style={styles.titleText}>{item.title}</div>
-              <div style={styles.artistText}>{item.artist}</div>
+              {/* 🎵 CONTENU */}
+              <div style={styles.item}>
+                <div>
+                  <div style={styles.titleText}>{item.title}</div>
+                  <div style={styles.artistText}>{item.artist}</div>
+                </div>
+              </div>
+
+              {/* 🟢 BOUTON VOTE */}
+              <button
+                style={styles.voteButton}
+                onClick={() => handleVote(item.id, item.votes)}
+              >
+                Voter
+              </button>
+
             </div>
-          </div>
-        
-        </div>
-
-
-
           ))}
         </div>
+
       </div>
-
-      {/* =========================
-          ⚠️ MODAL CONFIRMATION
-      ========================= */}
-      {trackToDelete && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-
-            <p>❌ Supprimer cette musique ?</p>
-
-            <div style={styles.modalActions}>
-              <button
-                style={styles.cancelBtn}
-                onClick={() => setTrackToDelete(null)}
-              >
-                Annuler
-              </button>
-
-              <button
-                style={styles.deleteBtn}
-                onClick={confirmDelete}
-              >
-                Supprimer
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -363,87 +282,24 @@ const styles = {
 
   titleText: { fontWeight: "bold", fontSize: 14 },
   artistText: { fontSize: 11, color: "#666" },
-  votes: { fontWeight: "bold" },
-
-  delete: {
-    border: "none",
-    background: "transparent",
-    color: "red",
-    fontSize: 16,
-  },
-
-  /* =========================
-     MODAL
-  ========================= */
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0,0,0,0.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  modal: {
-    background: "white",
-    padding: 20,
-    borderRadius: 12,
-    textAlign: "center",
-  },
-
-  modalActions: {
-    display: "flex",
-    gap: 10,
-    marginTop: 10,
-    justifyContent: "center",
-  },
-
-  cancelBtn: {
-    padding: 10,
-    border: "none",
-    background: "#ddd",
-    borderRadius: 8,
-  },
-
-  deleteBtn: {
-    padding: 10,
-    border: "none",
-    background: "red",
-    color: "white",
-    borderRadius: 8,
-  },
 
   voteBox: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
     width: 40,
-    marginRight: 6,
   },
 
+  voteIcon: { fontSize: 14 },
+  voteCount: { fontSize: 12, fontWeight: "bold" },
 
-    voteButton: {
+  voteButton: {
     padding: "6px 10px",
     border: "none",
     background: "#2563eb",
     color: "white",
     borderRadius: 8,
+    fontSize: 12,
     cursor: "pointer",
-    fontSize: 12,
   },
-  
-  voteIcon: {
-    fontSize: 14,
-  },
-  
-  voteCount: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#111",
-  },
-
 };
