@@ -23,7 +23,7 @@ export default function App() {
   const [tracks, setTracks] = useState([]);
 
   // =========================
-  // 👤 USER ID LOCAL (ANTI DOUBLE VOTE)
+  // 👤 USER ID LOCAL
   // =========================
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
@@ -42,7 +42,7 @@ export default function App() {
   const [swipeX, setSwipeX] = useState({});
 
   // =========================
-  // 🔥 FIREBASE CONFIG
+  // 🔥 FIREBASE
   // =========================
   const colRef = collection(db, "tracks");
   const q = query(colRef, orderBy("createdAt", "desc"));
@@ -138,16 +138,28 @@ export default function App() {
   };
 
   // =========================
-  // 👍 VOTE AVEC ANTI DOUBLE VOTE
+  // 👍 TOGGLE VOTE (VOTE / UNVOTE)
   // =========================
   const handleVote = async (track) => {
     const trackRef = doc(db, "tracks", track.id);
 
-    // 🚫 si déjà voté → stop
-    if (track.votedBy?.includes(userId)) {
+    const alreadyVoted = track.votedBy?.includes(userId);
+
+    // =========================
+    // ❌ RETRAIT DU VOTE
+    // =========================
+    if (alreadyVoted) {
+      await updateDoc(trackRef, {
+        votes: Math.max((track.votes || 1) - 1, 0),
+        votedBy: (track.votedBy || []).filter((id) => id !== userId),
+      });
+
       return;
     }
 
+    // =========================
+    // 👍 AJOUT DU VOTE
+    // =========================
     await updateDoc(trackRef, {
       votes: (track.votes || 0) + 1,
       votedBy: [...(track.votedBy || []), userId],
@@ -216,17 +228,15 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* VOTE BUTTON */}
+                {/* VOTE BUTTON TOGGLE */}
                 <button
                   style={{
                     ...styles.voteButton,
-                    opacity: hasVoted ? 0.4 : 1,
-                    cursor: hasVoted ? "not-allowed" : "pointer",
+                    background: hasVoted ? "#ef4444" : "#2563eb",
                   }}
-                  disabled={hasVoted}
                   onClick={() => handleVote(item)}
                 >
-                  {hasVoted ? "Voté" : "Voter"}
+                  {hasVoted ? "Annuler vote" : "Voter"}
                 </button>
 
               </div>
@@ -315,9 +325,9 @@ const styles = {
   voteButton: {
     padding: "6px 10px",
     border: "none",
-    background: "#2563eb",
     color: "white",
     borderRadius: 8,
     fontSize: 12,
+    cursor: "pointer",
   },
 };
