@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
 
-// 🔌 Import des fonctions Firebase (Firestore)
+// 🔌 Firestore
 import {
   collection,
   addDoc,
@@ -15,39 +15,29 @@ import {
 export default function App() {
 
   // =========================
-  // 🎯 STATES (données React)
+  // 🎯 STATES INPUTS
   // =========================
-
-  // 📝 Input titre
   const [title, setTitle] = useState("");
-
-  // 🧑‍🎤 Input artiste
   const [artist, setArtist] = useState("");
-
-  // 📦 Liste des musiques récupérées depuis Firebase
   const [tracks, setTracks] = useState([]);
 
+  // =========================
+  // 👆 STATE SWIPE (NEW)
+  // =========================
+  // stocke le déplacement horizontal de chaque item
+  const [swipeX, setSwipeX] = useState({});
 
   // =========================
   // 🔥 FIREBASE CONFIG
   // =========================
-
-  // 📁 Référence à la collection "tracks" dans Firebase
   const colRef = collection(db, "tracks");
-
-  // 📊 Requête : tri par date de création (du plus récent au plus ancien)
   const q = query(colRef, orderBy("createdAt", "desc"));
 
-
   // =========================
-  // 📡 ÉCOUTE TEMPS RÉEL
+  // 📡 REALTIME LISTENER
   // =========================
-
   useEffect(() => {
-    // 🔁 on écoute en temps réel les changements dans Firestore
     const unsub = onSnapshot(q, (snapshot) => {
-
-      // 🔄 transformation des données Firebase → format utilisable
       setTracks(
         snapshot.docs.map((doc) => ({
           id: doc.id,
@@ -56,57 +46,100 @@ export default function App() {
       );
     });
 
-    // 🧹 nettoyage du listener quand le composant se démonte
     return () => unsub();
   }, []);
 
+  // =========================
+  // 👆 SWIPE START
+  // =========================
+  const handleTouchStart = (e, id) => {
+    const startX = e.touches[0].clientX;
+
+    setSwipeX((prev) => ({
+      ...prev,
+      [id]: {
+        startX,
+        moveX: 0,
+      },
+    }));
+  };
 
   // =========================
-  // ➕ FONCTION AJOUTER UN SON
+  // 👉 SWIPE MOVE
   // =========================
+  const handleTouchMove = (e, id) => {
+    const moveX = e.touches[0].clientX;
 
+    setSwipeX((prev) => {
+      const item = prev[id];
+      if (!item) return prev;
+
+      return {
+        ...prev,
+        [id]: {
+          ...item,
+          moveX: moveX - item.startX,
+        },
+      };
+    });
+  };
+
+  // =========================
+  // ✋ SWIPE END
+  // =========================
+  const handleTouchEnd = (id) => {
+    const item = swipeX[id];
+    if (!item) return;
+
+    // ❌ swipe gauche suffisant → delete
+    if (item.moveX < -80) {
+      removeTrack(id);
+    }
+
+    // 🔄 reset animation
+    setSwipeX((prev) => ({
+      ...prev,
+      [id]: {
+        startX: 0,
+        moveX: 0,
+      },
+    }));
+  };
+
+  // =========================
+  // ➕ ADD TRACK
+  // =========================
   const addTrack = async () => {
-
-    // 🚫 Empêche d’ajouter un champ vide
     if (!title.trim()) return;
 
-    // 📥 Ajout dans Firebase
     await addDoc(colRef, {
-      title,                       // 🎵 titre du morceau
-      artist: artist || "Unknown", // 🧑‍🎤 artiste (fallback)
-      createdAt: Date.now(),       // ⏱️ date de création
-      votes: 0,                    // 👍 compteur de votes (prévu pour plus tard)
-      votedBy: [],                 // 👤 liste des utilisateurs ayant voté
+      title,
+      artist: artist || "Unknown",
+      createdAt: Date.now(),
+      votes: 0,
+      votedBy: [],
     });
 
-    // 🔄 Reset des inputs après ajout
     setTitle("");
     setArtist("");
   };
 
-
   // =========================
-  // ❌ FONCTION SUPPRIMER UN SON
+  // ❌ DELETE TRACK
   // =========================
-
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
-
   // =========================
-  // 🎨 INTERFACE UTILISATEUR (UI)
+  // 🎨 UI
   // =========================
-
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.title}>🎵 Music Queue</h1>
+        <h1 style={styles.title}>🎵 PLAYLIST</h1>
 
-        {/* =========================
-            📝 INPUTS UTILISATEUR
-        ========================= */}
-
+        {/* INPUTS */}
         <div style={styles.inputCol}>
           <input
             style={styles.input}
@@ -127,47 +160,61 @@ export default function App() {
           </button>
         </div>
 
-        {/* =========================
-            📋 LISTE DES MUSIQUES
-        ========================= */}
-
+        {/* LIST */}
         <div style={styles.list}>
           {tracks.length === 0 ? (
             <div style={styles.empty}>Aucun morceau</div>
           ) : (
-            tracks.map((item, index) => (
-
-            <div key={item.id} style={styles.itemRow}>
-            
-              {/* ❌ bouton suppression à gauche */}
-              <button
-                style={styles.delete}
-                onClick={() => removeTrack(item.id)}
-              >
-                ✕
-              </button>
-            
-              {/* 🎵 contenu principal */}
-              <div style={styles.item}>
-                <div style={styles.text}>
-                  <div style={styles.titleText}>
-                    {item.title}
-                  </div>
-                  <div style={styles.artistText}>
-                    {item.artist || "Unknown"}
-                  </div>
-                </div>
-            
-                {/* 👍 votes à droite */}
-                <div style={styles.votes}>
-                  👍 {item.votes || 0}
-                </div>
-              </div>
-            
-            </div>
-
-
+            tracks.map((item) => (
               
+              // =========================
+              // 📦 SWIPE ITEM
+              // =========================
+              <div
+                key={item.id}
+                style={{
+                  ...styles.itemRow,
+
+                  // 🎯 déplacement swipe
+                  transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
+
+                  // 🎬 animation retour
+                  transition: "transform 0.2s",
+                }}
+
+                // 👇 events tactile
+                onTouchStart={(e) => handleTouchStart(e, item.id)}
+                onTouchMove={(e) => handleTouchMove(e, item.id)}
+                onTouchEnd={() => handleTouchEnd(item.id)}
+              >
+
+                {/* ❌ DELETE */}
+                <button
+                  style={styles.delete}
+                  onClick={() => removeTrack(item.id)}
+                >
+                  ✕
+                </button>
+
+                {/* 🎵 CONTENT */}
+                <div style={styles.item}>
+                  <div style={styles.text}>
+                    <div style={styles.titleText}>
+                      {item.title}
+                    </div>
+
+                    <div style={styles.artistText}>
+                      {item.artist || "Unknown"}
+                    </div>
+                  </div>
+
+                  {/* 👍 VOTES */}
+                  <div style={styles.votes}>
+                    👍 {item.votes || 0}
+                  </div>
+                </div>
+
+              </div>
             ))
           )}
         </div>
@@ -177,12 +224,11 @@ export default function App() {
   );
 }
 
-
-// =========================
-// 🎨 STYLES
-// =========================
-
+/* =========================
+🎨 STYLES
+========================= */
 const styles = {
+
   page: {
     minHeight: "100vh",
     display: "flex",
@@ -190,37 +236,22 @@ const styles = {
     alignItems: "center",
     background: "#f1f5f9",
     fontFamily: "Arial",
-    padding: 12, // 🔥 réduit pour mobile
+    padding: 12,
   },
 
-card: {
-  width: "100%",
-  maxWidth: 420,
-  background: "white",
-  borderRadius: 16,
-  padding: 16,
-  boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-},
+  card: {
+    width: "100%",
+    maxWidth: 420,
+    background: "white",
+    borderRadius: 16,
+    padding: 16,
+    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+  },
 
   title: {
     marginBottom: 20,
   },
 
-  titleText: {
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  
-  artistText: {
-    fontSize: 11,
-    color: "#666",
-  },
-
-  votes: {
-    fontWeight: "bold",
-    fontSize: 13,
-  },
-  
   inputCol: {
     display: "flex",
     flexDirection: "column",
@@ -249,6 +280,13 @@ card: {
     gap: 10,
   },
 
+  itemRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+
   item: {
     flex: 1,
     display: "flex",
@@ -260,11 +298,24 @@ card: {
     background: "#fafafa",
   },
 
-  itemRow: {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  marginBottom: 6,
+  text: {
+    display: "flex",
+    flexDirection: "column",
+  },
+
+  titleText: {
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+
+  artistText: {
+    fontSize: 11,
+    color: "#666",
+  },
+
+  votes: {
+    fontWeight: "bold",
+    fontSize: 13,
   },
 
   delete: {
