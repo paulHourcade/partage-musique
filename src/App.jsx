@@ -15,7 +15,7 @@ export default function App() {
   const [song, setSong] = useState("");
   const [queue, setQueue] = useState([]);
 
-  const colRef = collection(db, "songs");
+  const colRef = collection(db, "tracks");
   const q = query(colRef, orderBy("createdAt", "desc"));
 
   // 📡 écoute temps réel
@@ -46,7 +46,7 @@ export default function App() {
 
   // ❌ supprimer
   const removeSong = async (id) => {
-    await deleteDoc(doc(db, "songs", id));
+    await deleteDoc(doc(db, "tracks", id));
   };
 
   return (
