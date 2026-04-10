@@ -15,24 +15,24 @@ import {
 export default function App() {
 
   // =========================
-  // 🎵 INPUTS MUSIQUE
+  // 🎯 INPUT STATES
   // =========================
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
-
-  // =========================
-  // 📦 TRACKS
-  // =========================
   const [tracks, setTracks] = useState([]);
 
   // =========================
-  // 👤 AUTH SIMPLE
+  // 👤 AUTH SIMPLE (AJOUTÉ)
   // =========================
   const [usernameInput, setUsernameInput] = useState("");
+
   const [username, setUsername] = useState(() => {
     return localStorage.getItem("username") || "";
   });
 
+  // =========================
+  // 🆔 USER ID LOCAL
+  // =========================
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
 
@@ -45,9 +45,14 @@ export default function App() {
   });
 
   // =========================
-  // 👆 SWIPE
+  // 👆 SWIPE STATE
   // =========================
   const [swipeX, setSwipeX] = useState({});
+
+  // =========================
+  // ⚠️ MODAL DELETE STATE
+  // =========================
+  const [trackToDelete, setTrackToDelete] = useState(null);
 
   // =========================
   // 🔥 FIREBASE
@@ -56,7 +61,7 @@ export default function App() {
   const q = query(colRef, orderBy("createdAt", "desc"));
 
   // =========================
-  // 📡 REALTIME
+  // 📡 REALTIME LISTENER
   // =========================
   useEffect(() => {
     const unsub = onSnapshot(q, (snapshot) => {
@@ -72,7 +77,7 @@ export default function App() {
   }, []);
 
   // =========================
-  // 👤 LOGIN
+  // 👤 LOGIN FUNCTION
   // =========================
   const handleLogin = () => {
     if (!usernameInput.trim()) return;
@@ -101,16 +106,18 @@ export default function App() {
   };
 
   // =========================
-  // ❌ DELETE
+  // ❌ DELETE TRACK
   // =========================
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
   // =========================
-  // 👍 VOTE TOGGLE
+  // 👍 VOTE TOGGLE (AVEC AUTH)
   // =========================
   const handleVote = async (track) => {
+
+    // 🚫 si pas connecté → pas de vote
     if (!username) return;
 
     const trackRef = doc(db, "tracks", track.id);
@@ -119,6 +126,7 @@ export default function App() {
       (v) => v.id === userId
     );
 
+    // ❌ retirer vote
     if (alreadyVoted) {
       await updateDoc(trackRef, {
         votes: Math.max((track.votes || 1) - 1, 0),
@@ -129,17 +137,21 @@ export default function App() {
       return;
     }
 
+    // 👍 ajouter vote
     await updateDoc(trackRef, {
       votes: (track.votes || 0) + 1,
       votedBy: [
         ...(track.votedBy || []),
-        { id: userId, name: username }
+        {
+          id: userId,
+          name: username
+        }
       ],
     });
   };
 
   // =========================
-  // 👆 SWIPE LOGIC
+  // 👆 SWIPE START
   // =========================
   const handleTouchStart = (e, id) => {
     const startX = e.touches[0].clientX;
@@ -150,6 +162,9 @@ export default function App() {
     }));
   };
 
+  // =========================
+  // 👉 SWIPE MOVE
+  // =========================
   const handleTouchMove = (e, id) => {
     const moveX = e.touches[0].clientX;
 
@@ -167,18 +182,31 @@ export default function App() {
     });
   };
 
+  // =========================
+  // ✋ SWIPE END
+  // =========================
   const handleTouchEnd = (id) => {
     const item = swipeX[id];
     if (!item) return;
 
     if (item.moveX < -80) {
-      removeTrack(id);
+      setTrackToDelete(id);
     }
 
     setSwipeX((prev) => ({
       ...prev,
       [id]: { startX: 0, moveX: 0 },
     }));
+  };
+
+  // =========================
+  // 🧠 CONFIRM DELETE
+  // =========================
+  const confirmDelete = async () => {
+    if (!trackToDelete) return;
+
+    await removeTrack(trackToDelete);
+    setTrackToDelete(null);
   };
 
   // =========================
@@ -189,7 +217,7 @@ export default function App() {
       <div style={styles.card}>
 
         {/* =========================
-            👤 LOGIN EN HAUT
+            👤 LOGIN TOUT EN HAUT
         ========================= */}
         <div style={styles.topBar}>
 
@@ -208,7 +236,7 @@ export default function App() {
             </div>
           ) : (
             <div style={styles.loggedAs}>
-              👤 {username}
+              👤 Connecté en tant que <b>{username}</b>
             </div>
           )}
 
@@ -220,14 +248,14 @@ export default function App() {
         <h1 style={styles.title}>🎵 PLAYLIST</h1>
 
         {/* =========================
-            INPUTS MUSIQUE
+            INPUTS
         ========================= */}
         <div style={styles.inputCol}>
           <input
             style={styles.input}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Titre"
+            placeholder="Titre du son"
           />
 
           <input
@@ -279,7 +307,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* VOTE BUTTON */}
+                {/* VOTE BUTTON (SI CONNECTÉ) */}
                 {username && (
                   <button
                     style={{
@@ -298,12 +326,42 @@ export default function App() {
         </div>
 
       </div>
+
+      {/* =========================
+          MODAL DELETE
+      ========================= */}
+      {trackToDelete && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+
+            <p>❌ Supprimer cette musique ?</p>
+
+            <div style={styles.modalActions}>
+              <button
+                style={styles.cancelBtn}
+                onClick={() => setTrackToDelete(null)}
+              >
+                Annuler
+              </button>
+
+              <button
+                style={styles.deleteBtn}
+                onClick={confirmDelete}
+              >
+                Supprimer
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
 
 /* =========================
-🎨 STYLES
+🎨 STYLES (inchangés)
 ========================= */
 const styles = {
 
@@ -339,9 +397,7 @@ const styles = {
     color: "#555",
   },
 
-  title: {
-    marginBottom: 20,
-  },
+  title: { marginBottom: 20 },
 
   inputCol: {
     display: "flex",
@@ -398,5 +454,46 @@ const styles = {
     borderRadius: 8,
     fontSize: 12,
     cursor: "pointer",
+  },
+
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modal: {
+    background: "white",
+    padding: 20,
+    borderRadius: 12,
+    textAlign: "center",
+    width: 260,
+  },
+
+  modalActions: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: 12,
+  },
+
+  cancelBtn: {
+    padding: 8,
+    border: "none",
+    background: "#ddd",
+    borderRadius: 8,
+  },
+
+  deleteBtn: {
+    padding: 8,
+    border: "none",
+    background: "#ef4444",
+    color: "white",
+    borderRadius: 8,
   },
 };
