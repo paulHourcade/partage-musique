@@ -51,6 +51,15 @@ export default function App() {
 
   // =========================
   // 👆 SWIPE START
+    /*Swipe → détecté
+          ↓
+    seuil dépassé ?
+          ↓
+    popup confirmation
+          ↓
+    oui → delete
+    non → annule
+  */
   // =========================
   const handleTouchStart = (e, id) => {
     const startX = e.touches[0].clientX;
@@ -87,16 +96,34 @@ export default function App() {
   // =========================
   // ✋ SWIPE END
   // =========================
+
+
   const handleTouchEnd = (id) => {
+    // 📦 on récupère les infos du swipe pour cet item
     const item = swipeX[id];
+  
+    // 🚫 sécurité
     if (!item) return;
-
-    // ❌ swipe gauche suffisant → delete
+  
+    // =========================
+    // 🔥 CAS : SWIPE SUFFISANT
+    // =========================
     if (item.moveX < -80) {
-      removeTrack(id);
+  
+      // ⚠️ DEMANDE DE CONFIRMATION AVANT SUPPRESSION
+      const confirmDelete = window.confirm(
+        "❌ Supprimer cette musique ?"
+      );
+  
+      // 👍 si utilisateur confirme
+      if (confirmDelete) {
+        removeTrack(id);
+      }
     }
-
-    // 🔄 reset animation
+  
+    // =========================
+    // 🔄 RESET DU SWIPE
+    // =========================
     setSwipeX((prev) => ({
       ...prev,
       [id]: {
@@ -105,6 +132,8 @@ export default function App() {
       },
     }));
   };
+
+  
 
   // =========================
   // ➕ ADD TRACK
