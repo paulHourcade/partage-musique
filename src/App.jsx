@@ -24,7 +24,7 @@ export default function App() {
 
   // 📦 collection Firestore
   const colRef = collection(db, "tracks");
-  const q = query(colRef, orderBy("createdAt", "desc"));
+  const q = query(colRef, orderBy("votes", "desc"));
 
   // 📡 realtime listener
   useEffect(() => {
