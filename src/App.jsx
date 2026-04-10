@@ -10,6 +10,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  updateDoc,
 } from "firebase/firestore";
 
 export default function App() {
@@ -189,6 +190,43 @@ export default function App() {
         ========================= */}
         <div style={styles.list}>
           {tracks.map((item) => (
+
+          <div
+            key={item.id}
+            style={{
+              ...styles.itemRow,
+              transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
+              transition: "transform 0.2s",
+            }}
+            onTouchStart={(e) => handleTouchStart(e, item.id)}
+            onTouchMove={(e) => handleTouchMove(e, item.id)}
+            onTouchEnd={() => handleTouchEnd(item.id)}
+          >
+          
+            {/* 👍 VOTES (VISUEL) */}
+            <div style={styles.voteBox}>
+              <span style={styles.voteIcon}>👍</span>
+              <span style={styles.voteCount}>{item.votes || 0}</span>
+            </div>
+          
+            {/* 🎵 CONTENU */}
+            <div style={styles.item}>
+              <div>
+                <div style={styles.titleText}>{item.title}</div>
+                <div style={styles.artistText}>{item.artist}</div>
+              </div>
+            </div>
+          
+            {/* 🟢 BOUTON VOTE */}
+            <button
+              style={styles.voteButton}
+              onClick={() => handleVote(item.id, item.votes)}
+            >
+              Voter
+            </button>
+          
+          </div>
+
 
         <div
           key={item.id}
@@ -385,6 +423,17 @@ const styles = {
     justifyContent: "center",
     width: 40,
     marginRight: 6,
+  },
+
+
+    voteButton: {
+    padding: "6px 10px",
+    border: "none",
+    background: "#2563eb",
+    color: "white",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontSize: 12,
   },
   
   voteIcon: {
