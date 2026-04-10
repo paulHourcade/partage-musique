@@ -136,18 +136,19 @@ const voteTrack = async (id) => {
                     {item.artist}
                   </div>
                 </div>
-
                 <div style={styles.actions}>
-                  <button onClick={() => voteTrack(item.id)}>
-                    {item.votedBy?.includes(userId) ? "👎" : "👍"} {item.votes || 0}
-                  </button>
-                  <button
-                    style={styles.delete}
-                    onClick={() => removeTrack(item.id)}
-                  >
-                    ✕
-                  </button>
+                  {/* VISUEL UNIQUEMENT */}
+                  <span>
+                    👍 {item.votes || 0}
+                  </span>
+                  {/* BOUTON ACTION */}
+                  {!item.votedBy?.includes(userId) && (
+                    <button onClick={() => voteTrack(item.id)}>
+                      Voter pour
+                    </button>
+                  )}
                 </div>
+
               </div>
             ))
           )}
