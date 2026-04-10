@@ -10,7 +10,7 @@ import {
   onSnapshot,
   orderBy,
   query,
-  updateDoc, // ⭐ AJOUT POUR LE VOTE
+  updateDoc,
 } from "firebase/firestore";
 
 export default function App() {
@@ -21,6 +21,20 @@ export default function App() {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [tracks, setTracks] = useState([]);
+
+  // =========================
+  // 👤 USER ID LOCAL (ANTI DOUBLE VOTE)
+  // =========================
+  const [userId] = useState(() => {
+    let id = localStorage.getItem("userId");
+
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem("userId", id);
+    }
+
+    return id;
+  });
 
   // =========================
   // 👆 SWIPE STATE
@@ -99,7 +113,7 @@ export default function App() {
   };
 
   // =========================
-  // ➕ AJOUT MUSIQUE
+  // ➕ ADD TRACK
   // =========================
   const addTrack = async () => {
     if (!title.trim()) return;
@@ -117,20 +131,26 @@ export default function App() {
   };
 
   // =========================
-  // ❌ SUPPRESSION
+  // ❌ DELETE TRACK
   // =========================
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
   // =========================
-  // 👍 VOTE (NEW)
+  // 👍 VOTE AVEC ANTI DOUBLE VOTE
   // =========================
-  const handleVote = async (id, currentVotes) => {
-    const trackRef = doc(db, "tracks", id);
+  const handleVote = async (track) => {
+    const trackRef = doc(db, "tracks", track.id);
+
+    // 🚫 si déjà voté → stop
+    if (track.votedBy?.includes(userId)) {
+      return;
+    }
 
     await updateDoc(trackRef, {
-      votes: (currentVotes || 0) + 1,
+      votes: (track.votes || 0) + 1,
+      votedBy: [...(track.votedBy || []), userId],
     });
   };
 
@@ -142,9 +162,7 @@ export default function App() {
       <div style={styles.card}>
         <h1 style={styles.title}>🎵 PLAYLIST</h1>
 
-        {/* =========================
-            📝 INPUTS
-        ========================= */}
+        {/* INPUTS */}
         <div style={styles.inputCol}>
           <input
             style={styles.input}
@@ -165,47 +183,55 @@ export default function App() {
           </button>
         </div>
 
-        {/* =========================
-            📋 LISTE
-        ========================= */}
+        {/* LIST */}
         <div style={styles.list}>
-          {tracks.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                ...styles.itemRow,
-                transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
-                transition: "transform 0.2s",
-              }}
-              onTouchStart={(e) => handleTouchStart(e, item.id)}
-              onTouchMove={(e) => handleTouchMove(e, item.id)}
-              onTouchEnd={() => handleTouchEnd(item.id)}
-            >
+          {tracks.map((item) => {
 
-              {/* 👍 VOTES VISUELS */}
-              <div style={styles.voteBox}>
-                <span style={styles.voteIcon}>👍</span>
-                <span style={styles.voteCount}>{item.votes || 0}</span>
-              </div>
+            const hasVoted = item.votedBy?.includes(userId);
 
-              {/* 🎵 CONTENU */}
-              <div style={styles.item}>
-                <div>
-                  <div style={styles.titleText}>{item.title}</div>
-                  <div style={styles.artistText}>{item.artist}</div>
-                </div>
-              </div>
-
-              {/* 🟢 BOUTON VOTE */}
-              <button
-                style={styles.voteButton}
-                onClick={() => handleVote(item.id, item.votes)}
+            return (
+              <div
+                key={item.id}
+                style={{
+                  ...styles.itemRow,
+                  transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
+                  transition: "transform 0.2s",
+                }}
+                onTouchStart={(e) => handleTouchStart(e, item.id)}
+                onTouchMove={(e) => handleTouchMove(e, item.id)}
+                onTouchEnd={() => handleTouchEnd(item.id)}
               >
-                Voter
-              </button>
 
-            </div>
-          ))}
+                {/* VOTES VISUELS */}
+                <div style={styles.voteBox}>
+                  <span>👍</span>
+                  <span>{item.votes || 0}</span>
+                </div>
+
+                {/* CONTENT */}
+                <div style={styles.item}>
+                  <div>
+                    <div style={styles.titleText}>{item.title}</div>
+                    <div style={styles.artistText}>{item.artist}</div>
+                  </div>
+                </div>
+
+                {/* VOTE BUTTON */}
+                <button
+                  style={{
+                    ...styles.voteButton,
+                    opacity: hasVoted ? 0.4 : 1,
+                    cursor: hasVoted ? "not-allowed" : "pointer",
+                  }}
+                  disabled={hasVoted}
+                  onClick={() => handleVote(item)}
+                >
+                  {hasVoted ? "Voté" : "Voter"}
+                </button>
+
+              </div>
+            );
+          })}
         </div>
 
       </div>
@@ -273,8 +299,6 @@ const styles = {
 
   item: {
     flex: 1,
-    display: "flex",
-    justifyContent: "space-between",
     padding: 10,
     background: "#fafafa",
     borderRadius: 10,
@@ -284,14 +308,9 @@ const styles = {
   artistText: { fontSize: 11, color: "#666" },
 
   voteBox: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
     width: 40,
+    textAlign: "center",
   },
-
-  voteIcon: { fontSize: 14 },
-  voteCount: { fontSize: 12, fontWeight: "bold" },
 
   voteButton: {
     padding: "6px 10px",
@@ -300,6 +319,5 @@ const styles = {
     color: "white",
     borderRadius: 8,
     fontSize: 12,
-    cursor: "pointer",
   },
 };
