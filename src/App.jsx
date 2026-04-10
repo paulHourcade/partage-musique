@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
+import { updateDoc, doc, increment } from "firebase/firestore";
+import { db } from "./firebase"; // ton config
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+
 
 import {
   collection,
@@ -48,6 +52,35 @@ export default function App() {
   const removeSong = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
+
+
+const voteTrack = async (id) => {
+  const trackRef = doc(db, "tracks", id);
+
+  await updateDoc(trackRef, {
+    votes: increment(1)
+  });
+};
+
+  useEffect(() => {
+  const q = query(
+    collection(db, "tracks"),
+    orderBy("votes", "desc"),
+    orderBy("createdAt", "asc")
+  );
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const tracksData = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    setTracks(tracksData);
+  });
+
+  return () => unsubscribe();
+}, []);
+  
 
   return (
     <div style={styles.page}>
