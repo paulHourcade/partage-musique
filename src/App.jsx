@@ -139,9 +139,10 @@ export default function App() {
               <div key={item.id} style={styles.item}>
 
                 {/* 🎵 Infos musique */}
-                <span>
-                  {index + 1}. {item.title} - {item.artist || "Unknown"}
-                </span>
+                  <span>
+                    {index + 1}. {item.title} - {item.artist || "Unknown"} 
+                    {" "}👍 {item.votes || 0}
+                  </span>
 
                 {/* ❌ Bouton suppression */}
                 <button
