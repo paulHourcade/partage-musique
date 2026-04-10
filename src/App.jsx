@@ -15,25 +15,24 @@ import {
 export default function App() {
 
   // =========================
-  // 🎵 INPUT MUSIQUE
+  // 🎵 INPUTS MUSIQUE
   // =========================
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
 
   // =========================
-  // 📦 LISTE MUSIQUES
+  // 📦 TRACKS
   // =========================
   const [tracks, setTracks] = useState([]);
 
   // =========================
-  // 👤 AUTH SIMPLE (USER)
+  // 👤 AUTH SIMPLE
   // =========================
   const [usernameInput, setUsernameInput] = useState("");
   const [username, setUsername] = useState(() => {
     return localStorage.getItem("username") || "";
   });
 
-  // 🆔 user unique local
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
 
@@ -46,7 +45,7 @@ export default function App() {
   });
 
   // =========================
-  // 👆 SWIPE STATE
+  // 👆 SWIPE
   // =========================
   const [swipeX, setSwipeX] = useState({});
 
@@ -57,7 +56,7 @@ export default function App() {
   const q = query(colRef, orderBy("createdAt", "desc"));
 
   // =========================
-  // 📡 REALTIME LISTENER
+  // 📡 REALTIME
   // =========================
   useEffect(() => {
     const unsub = onSnapshot(q, (snapshot) => {
@@ -73,7 +72,7 @@ export default function App() {
   }, []);
 
   // =========================
-  // 👤 VALIDATION USERNAME
+  // 👤 LOGIN
   // =========================
   const handleLogin = () => {
     if (!usernameInput.trim()) return;
@@ -84,7 +83,7 @@ export default function App() {
   };
 
   // =========================
-  // ➕ AJOUT MUSIQUE
+  // ➕ ADD TRACK
   // =========================
   const addTrack = async () => {
     if (!title.trim()) return;
@@ -102,18 +101,16 @@ export default function App() {
   };
 
   // =========================
-  // ❌ SUPPRESSION
+  // ❌ DELETE
   // =========================
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
   };
 
   // =========================
-  // 👍 VOTE AVEC IDENTITÉ
+  // 👍 VOTE TOGGLE
   // =========================
   const handleVote = async (track) => {
-
-    // 🚫 sécurité : pas connecté = pas de vote
     if (!username) return;
 
     const trackRef = doc(db, "tracks", track.id);
@@ -122,7 +119,6 @@ export default function App() {
       (v) => v.id === userId
     );
 
-    // ❌ retirer vote
     if (alreadyVoted) {
       await updateDoc(trackRef, {
         votes: Math.max((track.votes || 1) - 1, 0),
@@ -133,21 +129,17 @@ export default function App() {
       return;
     }
 
-    // 👍 ajouter vote avec identité
     await updateDoc(trackRef, {
       votes: (track.votes || 0) + 1,
       votedBy: [
         ...(track.votedBy || []),
-        {
-          id: userId,
-          name: username
-        }
+        { id: userId, name: username }
       ],
     });
   };
 
   // =========================
-  // 👆 SWIPE DELETE
+  // 👆 SWIPE LOGIC
   // =========================
   const handleTouchStart = (e, id) => {
     const startX = e.touches[0].clientX;
@@ -196,32 +188,39 @@ export default function App() {
     <div style={styles.page}>
       <div style={styles.card}>
 
+        {/* =========================
+            👤 LOGIN EN HAUT
+        ========================= */}
+        <div style={styles.topBar}>
+
+          {!username ? (
+            <div style={styles.loginBox}>
+              <input
+                style={styles.input}
+                placeholder="Ton nom"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+              />
+
+              <button style={styles.button} onClick={handleLogin}>
+                Valider
+              </button>
+            </div>
+          ) : (
+            <div style={styles.loggedAs}>
+              👤 {username}
+            </div>
+          )}
+
+        </div>
+
+        {/* =========================
+            TITRE
+        ========================= */}
         <h1 style={styles.title}>🎵 PLAYLIST</h1>
 
         {/* =========================
-            👤 LOGIN BLOCK
-        ========================= */}
-        {!username ? (
-          <div style={styles.loginBox}>
-            <input
-              style={styles.input}
-              placeholder="Ton nom"
-              value={usernameInput}
-              onChange={(e) => setUsernameInput(e.target.value)}
-            />
-
-            <button style={styles.button} onClick={handleLogin}>
-              Valider
-            </button>
-          </div>
-        ) : (
-          <div style={styles.loggedAs}>
-            👤 Connecté en tant que <b>{username}</b>
-          </div>
-        )}
-
-        {/* =========================
-            📝 ADD TRACK
+            INPUTS MUSIQUE
         ========================= */}
         <div style={styles.inputCol}>
           <input
@@ -244,7 +243,7 @@ export default function App() {
         </div>
 
         {/* =========================
-            📋 LIST
+            LISTE
         ========================= */}
         <div style={styles.list}>
           {tracks.map((item) => {
@@ -266,28 +265,21 @@ export default function App() {
                 onTouchEnd={() => handleTouchEnd(item.id)}
               >
 
-                {/* VOTES VISUELS */}
+                {/* VOTES */}
                 <div style={styles.voteBox}>
                   <span>👍</span>
                   <span>{item.votes || 0}</span>
                 </div>
 
-                {/* CONTENU */}
+                {/* TRACK */}
                 <div style={styles.item}>
                   <div>
                     <div style={styles.titleText}>{item.title}</div>
                     <div style={styles.artistText}>{item.artist}</div>
-
-                    {/* 👥 QUI A VOTÉ */}
-                    {item.votedBy?.length > 0 && (
-                      <div style={styles.voters}>
-                        {item.votedBy.map((v) => v.name).join(", ")}
-                      </div>
-                    )}
                   </div>
                 </div>
 
-                {/* 👍 BOUTON VOTE (UNIQUEMENT SI CONNECTÉ) */}
+                {/* VOTE BUTTON */}
                 {username && (
                   <button
                     style={{
@@ -333,18 +325,22 @@ const styles = {
     padding: 16,
   },
 
-  title: { marginBottom: 20 },
+  topBar: {
+    marginBottom: 10,
+  },
 
   loginBox: {
     display: "flex",
     gap: 10,
-    marginBottom: 15,
   },
 
   loggedAs: {
     fontSize: 12,
-    marginBottom: 10,
     color: "#555",
+  },
+
+  title: {
+    marginBottom: 20,
   },
 
   inputCol: {
@@ -402,11 +398,5 @@ const styles = {
     borderRadius: 8,
     fontSize: 12,
     cursor: "pointer",
-  },
-
-  voters: {
-    fontSize: 10,
-    color: "#666",
-    marginTop: 4,
   },
 };
