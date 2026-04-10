@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
-import { updateDoc, doc, increment, arrayUnion, getDoc } from "firebase/firestore";
 
 
 import {
-  collection,
   addDoc, 
+  arrayUnion,
+  collection,
   deleteDoc,
   doc,
+  increment,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
   updateDoc,
-  increment,
 } from "firebase/firestore";
 
 export default function App() {
