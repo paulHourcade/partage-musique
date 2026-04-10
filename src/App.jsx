@@ -15,20 +15,24 @@ import {
 export default function App() {
 
   // =========================
-  // 🎯 STATES INPUTS
+  // 🎯 INPUT STATES
   // =========================
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [tracks, setTracks] = useState([]);
 
   // =========================
-  // 👆 STATE SWIPE (NEW)
+  // 👆 SWIPE STATE
   // =========================
-  // stocke le déplacement horizontal de chaque item
   const [swipeX, setSwipeX] = useState({});
 
   // =========================
-  // 🔥 FIREBASE CONFIG
+  // ⚠️ MODAL DELETE STATE (NEW)
+  // =========================
+  const [trackToDelete, setTrackToDelete] = useState(null);
+
+  // =========================
+  // 🔥 FIREBASE
   // =========================
   const colRef = collection(db, "tracks");
   const q = query(colRef, orderBy("createdAt", "desc"));
@@ -51,6 +55,7 @@ export default function App() {
 
   // =========================
   // 👆 SWIPE START
+
     /*Swipe → détecté
           ↓
     seuil dépassé ?
@@ -60,16 +65,14 @@ export default function App() {
     oui → delete
     non → annule
   */
+  
   // =========================
   const handleTouchStart = (e, id) => {
     const startX = e.touches[0].clientX;
 
     setSwipeX((prev) => ({
       ...prev,
-      [id]: {
-        startX,
-        moveX: 0,
-      },
+      [id]: { startX, moveX: 0 },
     }));
   };
 
@@ -96,44 +99,22 @@ export default function App() {
   // =========================
   // ✋ SWIPE END
   // =========================
-
-
   const handleTouchEnd = (id) => {
-    // 📦 on récupère les infos du swipe pour cet item
     const item = swipeX[id];
-  
-    // 🚫 sécurité
     if (!item) return;
-  
-    // =========================
-    // 🔥 CAS : SWIPE SUFFISANT
-    // =========================
+
+    // 🔥 si swipe suffisant vers la gauche
     if (item.moveX < -80) {
-  
-      // ⚠️ DEMANDE DE CONFIRMATION AVANT SUPPRESSION
-      const confirmDelete = window.confirm(
-        "❌ Supprimer cette musique ?"
-      );
-  
-      // 👍 si utilisateur confirme
-      if (confirmDelete) {
-        removeTrack(id);
-      }
+      // ⚠️ on ouvre la modal au lieu de supprimer direct
+      setTrackToDelete(id);
     }
-  
-    // =========================
-    // 🔄 RESET DU SWIPE
-    // =========================
+
+    // 🔄 reset swipe visuel
     setSwipeX((prev) => ({
       ...prev,
-      [id]: {
-        startX: 0,
-        moveX: 0,
-      },
+      [id]: { startX: 0, moveX: 0 },
     }));
   };
-
-  
 
   // =========================
   // ➕ ADD TRACK
@@ -154,10 +135,22 @@ export default function App() {
   };
 
   // =========================
-  // ❌ DELETE TRACK
+  // ❌ DELETE TRACK (FIREBASE)
   // =========================
   const removeTrack = async (id) => {
     await deleteDoc(doc(db, "tracks", id));
+  };
+
+  // =========================
+  // 🧠 CONFIRM DELETE ACTION
+  // =========================
+  const confirmDelete = async () => {
+    if (!trackToDelete) return;
+
+    await removeTrack(trackToDelete);
+
+    // fermeture modal
+    setTrackToDelete(null);
   };
 
   // =========================
@@ -168,7 +161,9 @@ export default function App() {
       <div style={styles.card}>
         <h1 style={styles.title}>🎵 PLAYLIST</h1>
 
-        {/* INPUTS */}
+        {/* =========================
+            📝 INPUTS
+        ========================= */}
         <div style={styles.inputCol}>
           <input
             style={styles.input}
@@ -189,66 +184,74 @@ export default function App() {
           </button>
         </div>
 
-        {/* LIST */}
+        {/* =========================
+            📋 LISTE
+        ========================= */}
         <div style={styles.list}>
-          {tracks.length === 0 ? (
-            <div style={styles.empty}>Aucun morceau</div>
-          ) : (
-            tracks.map((item) => (
-              
-              // =========================
-              // 📦 SWIPE ITEM
-              // =========================
-              <div
-                key={item.id}
-                style={{
-                  ...styles.itemRow,
+          {tracks.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                ...styles.itemRow,
+                transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
+                transition: "transform 0.2s",
+              }}
+              onTouchStart={(e) => handleTouchStart(e, item.id)}
+              onTouchMove={(e) => handleTouchMove(e, item.id)}
+              onTouchEnd={() => handleTouchEnd(item.id)}
+            >
 
-                  // 🎯 déplacement swipe
-                  transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
-
-                  // 🎬 animation retour
-                  transition: "transform 0.2s",
-                }}
-
-                // 👇 events tactile
-                onTouchStart={(e) => handleTouchStart(e, item.id)}
-                onTouchMove={(e) => handleTouchMove(e, item.id)}
-                onTouchEnd={() => handleTouchEnd(item.id)}
+              <button
+                style={styles.delete}
+                onClick={() => setTrackToDelete(item.id)}
               >
+                ✕
+              </button>
 
-                {/* ❌ DELETE */}
-                <button
-                  style={styles.delete}
-                  onClick={() => removeTrack(item.id)}
-                >
-                  ✕
-                </button>
-
-                {/* 🎵 CONTENT */}
-                <div style={styles.item}>
-                  <div style={styles.text}>
-                    <div style={styles.titleText}>
-                      {item.title}
-                    </div>
-
-                    <div style={styles.artistText}>
-                      {item.artist || "Unknown"}
-                    </div>
-                  </div>
-
-                  {/* 👍 VOTES */}
-                  <div style={styles.votes}>
-                    👍 {item.votes || 0}
-                  </div>
+              <div style={styles.item}>
+                <div>
+                  <div style={styles.titleText}>{item.title}</div>
+                  <div style={styles.artistText}>{item.artist}</div>
                 </div>
 
+                <div style={styles.votes}>
+                  👍 {item.votes || 0}
+                </div>
               </div>
-            ))
-          )}
-        </div>
 
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* =========================
+          ⚠️ MODAL CONFIRMATION
+      ========================= */}
+      {trackToDelete && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+
+            <p>❌ Supprimer cette musique ?</p>
+
+            <div style={styles.modalActions}>
+              <button
+                style={styles.cancelBtn}
+                onClick={() => setTrackToDelete(null)}
+              >
+                Annuler
+              </button>
+
+              <button
+                style={styles.deleteBtn}
+                onClick={confirmDelete}
+              >
+                Supprimer
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -274,12 +277,9 @@ const styles = {
     background: "white",
     borderRadius: 16,
     padding: 16,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
   },
 
-  title: {
-    marginBottom: 20,
-  },
+  title: { marginBottom: 20 },
 
   inputCol: {
     display: "flex",
@@ -300,7 +300,6 @@ const styles = {
     color: "white",
     border: "none",
     borderRadius: 10,
-    cursor: "pointer",
   },
 
   list: {
@@ -313,52 +312,69 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: 6,
-    marginBottom: 6,
   },
 
   item: {
     flex: 1,
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
     padding: 10,
-    border: "1px solid #eee",
-    borderRadius: 10,
     background: "#fafafa",
+    borderRadius: 10,
   },
 
-  text: {
-    display: "flex",
-    flexDirection: "column",
-  },
-
-  titleText: {
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-
-  artistText: {
-    fontSize: 11,
-    color: "#666",
-  },
-
-  votes: {
-    fontWeight: "bold",
-    fontSize: 13,
-  },
+  titleText: { fontWeight: "bold", fontSize: 14 },
+  artistText: { fontSize: 11, color: "#666" },
+  votes: { fontWeight: "bold" },
 
   delete: {
     border: "none",
     background: "transparent",
     color: "red",
-    cursor: "pointer",
     fontSize: 16,
-    padding: 4,
   },
 
-  empty: {
-    textAlign: "center",
-    color: "#888",
+  /* =========================
+     MODAL
+  ========================= */
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modal: {
+    background: "white",
     padding: 20,
+    borderRadius: 12,
+    textAlign: "center",
+  },
+
+  modalActions: {
+    display: "flex",
+    gap: 10,
+    marginTop: 10,
+    justifyContent: "center",
+  },
+
+  cancelBtn: {
+    padding: 10,
+    border: "none",
+    background: "#ddd",
+    borderRadius: 8,
+  },
+
+  deleteBtn: {
+    padding: 10,
+    border: "none",
+    background: "red",
+    color: "white",
+    borderRadius: 8,
   },
 };
