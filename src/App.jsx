@@ -22,6 +22,50 @@ export default function App() {
   const [tracks, setTracks] = useState([]);
 
   // =========================
+  // 🎧 SPOTIFY CONFIG
+  // =========================
+  const CLIENT_ID = "ffb0cceefeff4104b72ab24ff0ad3d40"; // 
+
+  // =========================
+  // 🔎 SEARCH SPOTIFY TRACK
+  // =========================
+  const searchSpotifyTrack = async (title, artist) => {
+    try {
+      // 🔑 récupération token Spotify
+      const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic " + btoa(CLIENT_ID + ":"),
+        },
+        body: "grant_type=client_credentials",
+      });
+
+      const tokenData = await tokenRes.json();
+      const accessToken = tokenData.access_token;
+
+      // 🔎 recherche du titre + artiste
+      const searchRes = await fetch(
+        `https://api.spotify.com/v1/search?q=${title} ${artist}&type=track&limit=1`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const data = await searchRes.json();
+
+      // 🎯 retourne l'id du premier résultat
+      return data.tracks.items[0]?.id || null;
+
+    } catch (err) {
+      console.log("Erreur Spotify:", err);
+      return null;
+    }
+  };
+
+  // =========================
   // 🎬 ANIMATION STATES
   // =========================
   const [deletingId, setDeletingId] = useState(null);
@@ -67,9 +111,6 @@ export default function App() {
   const colRef = collection(db, "tracks");
   const q = query(colRef, orderBy("createdAt", "desc"));
 
-  // =========================
-  // 📡 REALTIME
-  // =========================
   useEffect(() => {
     const unsub = onSnapshot(q, (snapshot) => {
       setTracks(
@@ -95,15 +136,18 @@ export default function App() {
   };
 
   // =========================
-  // ➕ ADD TRACK
+  // ➕ ADD TRACK + SPOTIFY
   // =========================
   const addTrack = async () => {
     if (!title.trim()) return;
 
+    // 🔎 récupération spotifyId automatique
+    const spotifyId = await searchSpotifyTrack(title, artist);
+
     await addDoc(colRef, {
       title,
       artist: artist || "Unknown",
-      spotifyId: "xxxxx", // 🔥 important
+      spotifyId: spotifyId || null, // 🔥 stocké en base
       createdAt: Date.now(),
       votes: 0,
       votedBy: [],
@@ -158,49 +202,6 @@ export default function App() {
   };
 
   // =========================
-  // 👆 SWIPE
-  // =========================
-  const handleTouchStart = (e, id) => {
-    const startX = e.touches[0].clientX;
-
-    setSwipeX((prev) => ({
-      ...prev,
-      [id]: { startX, moveX: 0 },
-    }));
-  };
-
-  const handleTouchMove = (e, id) => {
-    const moveX = e.touches[0].clientX;
-
-    setSwipeX((prev) => {
-      const item = prev[id];
-      if (!item) return prev;
-
-      return {
-        ...prev,
-        [id]: {
-          ...item,
-          moveX: moveX - item.startX,
-        },
-      };
-    });
-  };
-
-  const handleTouchEnd = (id) => {
-    const item = swipeX[id];
-    if (!item) return;
-
-    if (item.moveX < -80) {
-      setTrackToDelete(id);
-    }
-
-    setSwipeX((prev) => ({
-      ...prev,
-      [id]: { startX: 0, moveX: 0 },
-    }));
-  };
-
-  // =========================
   // 🧠 CONFIRM DELETE
   // =========================
   const confirmDelete = async () => {
@@ -238,9 +239,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div style={styles.loggedAs}>
-              👤 {username}
-            </div>
+            <div>👤 {username}</div>
           )}
         </div>
 
@@ -276,39 +275,38 @@ export default function App() {
             );
 
             return (
-              <div
-                key={item.id}
-                style={{
-                  ...styles.itemRow,
-                  transform: deletingId === item.id
-                    ? "translateX(-100%) scale(0.9)"
-                    : `translateX(${swipeX[item.id]?.moveX || 0}px)`,
-                  opacity: deletingId === item.id ? 0 : 1,
-                  transition: "all 0.3s ease",
-                }}
-                onTouchStart={(e) => handleTouchStart(e, item.id)}
-                onTouchMove={(e) => handleTouchMove(e, item.id)}
-                onTouchEnd={() => handleTouchEnd(item.id)}
-              >
+              <div key={item.id} style={styles.itemRow}>
 
+                {/* 👍 */}
                 <div
                   style={{
                     ...styles.voteBox,
                     transform: animVotes[item.id] ? "scale(1.3)" : "scale(1)",
-                    transition: "transform 0.2s",
                   }}
                   onClick={() => setSelectedTrack(item)}
                 >
                   👍 {item.votes || 0}
                 </div>
 
+                {/* TRACK */}
                 <div style={styles.item}>
-                  <div>
-                    <div style={styles.titleText}>{item.title}</div>
-                    <div style={styles.artistText}>{item.artist}</div>
-                  </div>
+                  <div style={styles.titleText}>{item.title}</div>
+                  <div style={styles.artistText}>{item.artist}</div>
+
+                  {/* 🎧 BOUTON SPOTIFY */}
+                  {item.spotifyId && (
+                    <a
+                      href={`https://open.spotify.com/track/${item.spotifyId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontSize: 12, color: "#1DB954" }}
+                    >
+                      ▶ Écouter sur Spotify
+                    </a>
+                  )}
                 </div>
 
+                {/* VOTE */}
                 {username && (
                   <button
                     style={{
@@ -327,119 +325,11 @@ export default function App() {
         </div>
 
       </div>
-
-      {/* DELETE MODAL */}
-      {trackToDelete && (
-        <div style={styles.modalOverlayAnimated}>
-          <div style={styles.modalAnimated}>
-            <p>Supprimer cette musique ?</p>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button style={styles.cancelBtn} onClick={() => setTrackToDelete(null)}>
-                Annuler
-              </button>
-              <button style={styles.deleteBtn} onClick={confirmDelete}>
-                Supprimer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* VOTE MODAL */}
-      {selectedTrack && (
-        <div style={styles.modalOverlayAnimated}>
-          <div style={styles.modalAnimated}>
-
-            <button style={styles.closeBtn} onClick={() => setSelectedTrack(null)}>
-              ✕
-            </button>
-
-            <h3>Votes</h3>
-
-            {selectedTrack.votedBy?.length > 0 ? (
-              selectedTrack.votedBy.map((v, i) => (
-                <div key={i}>👤 {v.name}</div>
-              ))
-            ) : (
-              <div>Aucun vote</div>
-            )}
-
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
 
 const styles = {
-  page: { minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#f1f5f9", padding: 12 },
-  card: { width: "100%", maxWidth: 420, background: "white", borderRadius: 16, padding: 16 },
-  topBar: { marginBottom: 10 },
-  loginBox: { display: "flex", gap: 10 },
-  title: { marginBottom: 20 },
-  inputCol: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 },
-  input: { padding: 12, border: "1px solid #ddd", borderRadius: 10 },
-  button: { padding: "12px 16px", background: "#2563eb", color: "white", border: "none", borderRadius: 10 },
-  list: { display: "flex", flexDirection: "column", gap: 10 },
-
-  itemRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    animation: "fadeSlideIn 0.3s ease",
-  },
-
-  item: { flex: 1, padding: 10, background: "#fafafa", borderRadius: 10 },
-  titleText: { fontWeight: "bold", fontSize: 14 },
-  artistText: { fontSize: 11, color: "#666" },
-
-  voteBox: { width: 50, textAlign: "center", cursor: "pointer" },
-
-  voteButton: { padding: "6px 10px", border: "none", color: "white", borderRadius: 8 },
-
-  modalOverlayAnimated: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    animation: "fadeIn 0.2s ease",
-  },
-
-  modalAnimated: {
-    background: "white",
-    padding: 20,
-    borderRadius: 12,
-    width: 260,
-    animation: "zoomIn 0.2s ease",
-  },
-
-  closeBtn: {
-    fontSize: 28,
-    color: "#ef4444",
-    background: "transparent",
-    border: "none",
-    float: "right",
-    cursor: "pointer",
-  },
-
-  cancelBtn: {
-    flex: 1,
-    padding: "12px",
-    background: "#e5e7eb",
-    border: "none",
-    borderRadius: 10,
-  },
-
-  deleteBtn: {
-    flex: 1,
-    padding: "12px",
-    background: "#ef4444",
-    color: "white",
-    border: "none",
-    borderRadius: 10,
-  },
+  page: { padding: 20 },
+  card: { maxWidth: 400, margin: "auto" },
 };
