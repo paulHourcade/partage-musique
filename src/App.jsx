@@ -5,7 +5,7 @@ import { updateDoc, doc, increment, arrayUnion, getDoc } from "firebase/firestor
 
 import {
   collection,
-  addDoc,
+  addDoc, 
   deleteDoc,
   doc,
   onSnapshot,
