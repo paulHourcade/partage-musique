@@ -22,12 +22,6 @@ export default function App() {
   const [tracks, setTracks] = useState([]);
 
   // =========================
-  // 🎬 ANIMATION STATES
-  // =========================
-  const [deletingId, setDeletingId] = useState(null);
-  const [animVotes, setAnimVotes] = useState({});
-
-  // =========================
   // 👤 AUTH
   // =========================
   const [usernameInput, setUsernameInput] = useState("");
@@ -37,12 +31,10 @@ export default function App() {
 
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
-
     if (!id) {
       id = Math.random().toString(36).substring(2, 15);
       localStorage.setItem("userId", id);
     }
-
     return id;
   });
 
@@ -125,12 +117,6 @@ export default function App() {
   const handleVote = async (track) => {
     if (!username) return;
 
-    // 🎬 animation vote
-    setAnimVotes((prev) => ({ ...prev, [track.id]: true }));
-    setTimeout(() => {
-      setAnimVotes((prev) => ({ ...prev, [track.id]: false }));
-    }, 200);
-
     const trackRef = doc(db, "tracks", track.id);
 
     const alreadyVoted = track.votedBy?.some(
@@ -157,7 +143,7 @@ export default function App() {
   };
 
   // =========================
-  // 👆 SWIPE
+  // 👆 SWIPE (amélioré avec inertie)
   // =========================
   const handleTouchStart = (e, id) => {
     const startX = e.touches[0].clientX;
@@ -179,7 +165,7 @@ export default function App() {
         ...prev,
         [id]: {
           ...item,
-          moveX: moveX - item.startX,
+          moveX: (moveX - item.startX) * 0.9, // 🔥 ralentissement = effet plus smooth
         },
       };
     });
@@ -205,13 +191,7 @@ export default function App() {
   const confirmDelete = async () => {
     if (!trackToDelete) return;
 
-    setDeletingId(trackToDelete);
-
-    setTimeout(async () => {
-      await removeTrack(trackToDelete);
-      setDeletingId(null);
-    }, 300);
-
+    await removeTrack(trackToDelete);
     setTrackToDelete(null);
   };
 
@@ -247,23 +227,9 @@ export default function App() {
 
         {/* INPUTS */}
         <div style={styles.inputCol}>
-          <input
-            style={styles.input}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Titre du son"
-          />
-
-          <input
-            style={styles.input}
-            value={artist}
-            onChange={(e) => setArtist(e.target.value)}
-            placeholder="Artiste"
-          />
-
-          <button style={styles.button} onClick={addTrack}>
-            Ajouter
-          </button>
+          <input style={styles.input} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre du son" />
+          <input style={styles.input} value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Artiste" />
+          <button style={styles.button} onClick={addTrack}>Ajouter</button>
         </div>
 
         {/* LIST */}
@@ -279,28 +245,31 @@ export default function App() {
                 key={item.id}
                 style={{
                   ...styles.itemRow,
-                  transform: deletingId === item.id
-                    ? "translateX(-100%) scale(0.9)"
-                    : `translateX(${swipeX[item.id]?.moveX || 0}px)`,
-                  opacity: deletingId === item.id ? 0 : 1,
-                  transition: "all 0.3s ease",
+                  transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
+                  transition: "transform 0.3s ease-out", // 🔥 swipe smooth
+                  animation: "fadeIn 0.4s ease", // 🔥 apparition des tracks
                 }}
                 onTouchStart={(e) => handleTouchStart(e, item.id)}
                 onTouchMove={(e) => handleTouchMove(e, item.id)}
                 onTouchEnd={() => handleTouchEnd(item.id)}
               >
 
+                {/* 👍 VOTES */}
                 <div
-                  style={{
-                    ...styles.voteBox,
-                    transform: animVotes[item.id] ? "scale(1.3)" : "scale(1)",
-                    transition: "transform 0.2s",
-                  }}
+                  style={styles.voteBox}
                   onClick={() => setSelectedTrack(item)}
                 >
-                  👍 {item.votes || 0}
+                  <span style={{
+                    display: "inline-block",
+                    transition: "transform 0.2s",
+                    transform: hasVoted ? "scale(1.3)" : "scale(1)" // 🔥 effet pop vote
+                  }}>
+                    👍
+                  </span>
+                  <span>{item.votes || 0}</span>
                 </div>
 
+                {/* TRACK */}
                 <div style={styles.item}>
                   <div>
                     <div style={styles.titleText}>{item.title}</div>
@@ -308,6 +277,7 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* VOTE BUTTON */}
                 {username && (
                   <button
                     style={{
@@ -329,33 +299,21 @@ export default function App() {
 
       {/* DELETE MODAL */}
       {trackToDelete && (
-        <div style={styles.modalOverlayAnimated}>
-          <div style={styles.modalAnimated}>
+        <div style={{ ...styles.modalOverlay, animation: "fadeIn 0.2s" }}>
+          <div style={{ ...styles.modal, animation: "zoomIn 0.2s" }}>
             <p>Supprimer cette musique ?</p>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button style={styles.cancelBtn} onClick={() => setTrackToDelete(null)}>
-                Annuler
-              </button>
-              <button style={styles.deleteBtn} onClick={confirmDelete}>
-                Supprimer
-              </button>
-            </div>
+            <button style={styles.cancelBtn} onClick={() => setTrackToDelete(null)}>Annuler</button>
+            <button style={styles.deleteBtn} onClick={confirmDelete}>Supprimer</button>
           </div>
         </div>
       )}
 
       {/* VOTE MODAL */}
       {selectedTrack && (
-        <div style={styles.modalOverlayAnimated}>
-          <div style={styles.modalAnimated}>
-
-            <button style={styles.closeBtn} onClick={() => setSelectedTrack(null)}>
-              ✕
-            </button>
-
+        <div style={{ ...styles.modalOverlay, animation: "fadeIn 0.2s" }}>
+          <div style={{ ...styles.modal, animation: "zoomIn 0.2s" }}>
+            <button style={styles.closeBtn} onClick={() => setSelectedTrack(null)}>✕</button>
             <h3>Votes</h3>
-
             {selectedTrack.votedBy?.length > 0 ? (
               selectedTrack.votedBy.map((v, i) => (
                 <div key={i}>👤 {v.name}</div>
@@ -363,82 +321,23 @@ export default function App() {
             ) : (
               <div>Aucun vote</div>
             )}
-
           </div>
         </div>
       )}
 
+      {/* 🔥 ANIMATIONS CSS */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0 }
+          to { opacity: 1 }
+        }
+
+        @keyframes zoomIn {
+          from { transform: scale(0.9); opacity: 0 }
+          to { transform: scale(1); opacity: 1 }
+        }
+      `}</style>
+
     </div>
   );
 }
-
-const styles = {
-  page: { minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#f1f5f9", padding: 12 },
-  card: { width: "100%", maxWidth: 420, background: "white", borderRadius: 16, padding: 16 },
-  topBar: { marginBottom: 10 },
-  loginBox: { display: "flex", gap: 10 },
-  title: { marginBottom: 20 },
-  inputCol: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 },
-  input: { padding: 12, border: "1px solid #ddd", borderRadius: 10 },
-  button: { padding: "12px 16px", background: "#2563eb", color: "white", border: "none", borderRadius: 10 },
-  list: { display: "flex", flexDirection: "column", gap: 10 },
-
-  itemRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    animation: "fadeSlideIn 0.3s ease",
-  },
-
-  item: { flex: 1, padding: 10, background: "#fafafa", borderRadius: 10 },
-  titleText: { fontWeight: "bold", fontSize: 14 },
-  artistText: { fontSize: 11, color: "#666" },
-
-  voteBox: { width: 50, textAlign: "center", cursor: "pointer" },
-
-  voteButton: { padding: "6px 10px", border: "none", color: "white", borderRadius: 8 },
-
-  modalOverlayAnimated: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    animation: "fadeIn 0.2s ease",
-  },
-
-  modalAnimated: {
-    background: "white",
-    padding: 20,
-    borderRadius: 12,
-    width: 260,
-    animation: "zoomIn 0.2s ease",
-  },
-
-  closeBtn: {
-    fontSize: 28,
-    color: "#ef4444",
-    background: "transparent",
-    border: "none",
-    float: "right",
-    cursor: "pointer",
-  },
-
-  cancelBtn: {
-    flex: 1,
-    padding: "12px",
-    background: "#e5e7eb",
-    border: "none",
-    borderRadius: 10,
-  },
-
-  deleteBtn: {
-    flex: 1,
-    padding: "12px",
-    background: "#ef4444",
-    color: "white",
-    border: "none",
-    borderRadius: 10,
-  },
-};
