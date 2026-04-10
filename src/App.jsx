@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase";
+import { updateDoc, doc, increment, arrayUnion, getDoc } from "firebase/firestore";
+
 
 import {
   collection,
@@ -36,6 +38,19 @@ export default function App() {
     return () => unsub();
   }, []);
 
+// On récupère un ID unique par utilisateur pour l'empêcher de voter plusieurs fois 
+const getUserId = () => {
+  let id = localStorage.getItem("userId");
+
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("userId", id);
+  }
+  return id;
+};
+const userId = getUserId();
+  
+
   // ➕ ajouter un son
   const addTrack = async () => {
     if (!title.trim()) return;
@@ -45,6 +60,8 @@ export default function App() {
       artist: artist || "Unknown",
       votes: 0,
       createdAt: Date.now(),
+      votedBy: [],
+      createdAt: Date.Now
     });
 
     setTitle("");
@@ -57,13 +74,22 @@ export default function App() {
   };
 
   // 👍 voter
-  const voteTrack = async (id) => {
-    const ref = doc(db, "tracks", id);
+const voteTrack = async (id) => {
+  const ref = doc(db, "tracks", id);
+  const snap = await getDoc(ref);
 
-    await updateDoc(ref, {
-      votes: increment(1),
-    });
-  };
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+
+  // 🚫 si déjà voté → stop
+  if (data.votedBy?.includes(userId)) return;
+
+  await updateDoc(ref, {
+    votes: increment(1),
+    votedBy: arrayUnion(userId),
+  });
+};
 
   return (
     <div style={styles.page}>
