@@ -22,6 +22,12 @@ export default function App() {
   const [tracks, setTracks] = useState([]);
 
   // =========================
+  // 🎬 ANIMATION STATES
+  // =========================
+  const [deletingId, setDeletingId] = useState(null);
+  const [animVotes, setAnimVotes] = useState({});
+
+  // =========================
   // 👤 AUTH
   // =========================
   const [usernameInput, setUsernameInput] = useState("");
@@ -51,7 +57,7 @@ export default function App() {
   const [trackToDelete, setTrackToDelete] = useState(null);
 
   // =========================
-  // 👀 VOTE MODAL (NEW)
+  // 👀 VOTE MODAL
   // =========================
   const [selectedTrack, setSelectedTrack] = useState(null);
 
@@ -118,6 +124,12 @@ export default function App() {
   // =========================
   const handleVote = async (track) => {
     if (!username) return;
+
+    // 🎬 animation vote
+    setAnimVotes((prev) => ({ ...prev, [track.id]: true }));
+    setTimeout(() => {
+      setAnimVotes((prev) => ({ ...prev, [track.id]: false }));
+    }, 200);
 
     const trackRef = doc(db, "tracks", track.id);
 
@@ -193,7 +205,13 @@ export default function App() {
   const confirmDelete = async () => {
     if (!trackToDelete) return;
 
-    await removeTrack(trackToDelete);
+    setDeletingId(trackToDelete);
+
+    setTimeout(async () => {
+      await removeTrack(trackToDelete);
+      setDeletingId(null);
+    }, 300);
+
     setTrackToDelete(null);
   };
 
@@ -261,26 +279,28 @@ export default function App() {
                 key={item.id}
                 style={{
                   ...styles.itemRow,
-                  transform: `translateX(${swipeX[item.id]?.moveX || 0}px)`,
-                  transition: "transform 0.2s",
+                  transform: deletingId === item.id
+                    ? "translateX(-100%) scale(0.9)"
+                    : `translateX(${swipeX[item.id]?.moveX || 0}px)`,
+                  opacity: deletingId === item.id ? 0 : 1,
+                  transition: "all 0.3s ease",
                 }}
                 onTouchStart={(e) => handleTouchStart(e, item.id)}
                 onTouchMove={(e) => handleTouchMove(e, item.id)}
                 onTouchEnd={() => handleTouchEnd(item.id)}
               >
 
-                {/* 👍 VOTES CLIQUABLES */}
                 <div
-                  style={styles.voteBox}
+                  style={{
+                    ...styles.voteBox,
+                    transform: animVotes[item.id] ? "scale(1.3)" : "scale(1)",
+                    transition: "transform 0.2s",
+                  }}
                   onClick={() => setSelectedTrack(item)}
                 >
-                  <span>👍</span>
-                  <span style={{ cursor: "pointer" }}>
-                    {item.votes || 0}
-                  </span>
+                  👍 {item.votes || 0}
                 </div>
 
-                {/* TRACK */}
                 <div style={styles.item}>
                   <div>
                     <div style={styles.titleText}>{item.title}</div>
@@ -288,7 +308,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* VOTE BUTTON */}
                 {username && (
                   <button
                     style={{
@@ -308,53 +327,32 @@ export default function App() {
 
       </div>
 
-      {/* =========================
-          ❌ DELETE MODAL
-      ========================= */}
-        {trackToDelete && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modal}>
-        
-              <p style={{ marginBottom: 12 }}>
-                Supprimer cette musique ?
-              </p>
-        
-              <div style={{ display: "flex", gap: 10 }}>
-        
-                <button
-                  style={styles.cancelBtn}
-                  onClick={() => setTrackToDelete(null)}
-                >
-                  Annuler
-                </button>
-        
-                <button
-                  style={styles.deleteBtn}
-                  onClick={confirmDelete}
-                >
-                  Supprimer
-                </button>
-        
-              </div>
-        
+      {/* DELETE MODAL */}
+      {trackToDelete && (
+        <div style={styles.modalOverlayAnimated}>
+          <div style={styles.modalAnimated}>
+            <p>Supprimer cette musique ?</p>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button style={styles.cancelBtn} onClick={() => setTrackToDelete(null)}>
+                Annuler
+              </button>
+              <button style={styles.deleteBtn} onClick={confirmDelete}>
+                Supprimer
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-      {/* =========================
-          👀 VOTE MODAL (NEW)
-      ========================= */}
+      {/* VOTE MODAL */}
       {selectedTrack && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
+        <div style={styles.modalOverlayAnimated}>
+          <div style={styles.modalAnimated}>
 
-            {/* fermeture */}
-              <button
-                style={styles.closeBtn}
-                onClick={() => setSelectedTrack(null)}
-              >
-                ✕
-              </button>
+            <button style={styles.closeBtn} onClick={() => setSelectedTrack(null)}>
+              ✕
+            </button>
 
             <h3>Votes</h3>
 
@@ -374,145 +372,73 @@ export default function App() {
   );
 }
 
-/* styles inchangés sauf ajout click cursor si besoin */
 const styles = {
-
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    background: "#f1f5f9",
-    fontFamily: "Arial",
-    padding: 12,
-  },
-
-  card: {
-    width: "100%",
-    maxWidth: 420,
-    background: "white",
-    borderRadius: 16,
-    padding: 16,
-  },
-
+  page: { minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#f1f5f9", padding: 12 },
+  card: { width: "100%", maxWidth: 420, background: "white", borderRadius: 16, padding: 16 },
   topBar: { marginBottom: 10 },
   loginBox: { display: "flex", gap: 10 },
-
-  loggedAs: {
-    fontSize: 12,
-    color: "#555",
-  },
-
   title: { marginBottom: 20 },
-
-  inputCol: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-    marginBottom: 20,
-  },
-
-  input: {
-    padding: 12,
-    border: "1px solid #ddd",
-    borderRadius: 10,
-  },
-
-  button: {
-    padding: "12px 16px",
-    background: "#2563eb",
-    color: "white",
-    border: "none",
-    borderRadius: 10,
-  },
-
-  list: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
+  inputCol: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 },
+  input: { padding: 12, border: "1px solid #ddd", borderRadius: 10 },
+  button: { padding: "12px 16px", background: "#2563eb", color: "white", border: "none", borderRadius: 10 },
+  list: { display: "flex", flexDirection: "column", gap: 10 },
 
   itemRow: {
     display: "flex",
     alignItems: "center",
     gap: 6,
+    animation: "fadeSlideIn 0.3s ease",
   },
 
-  item: {
-    flex: 1,
-    padding: 10,
-    background: "#fafafa",
-    borderRadius: 10,
-  },
-
+  item: { flex: 1, padding: 10, background: "#fafafa", borderRadius: 10 },
   titleText: { fontWeight: "bold", fontSize: 14 },
   artistText: { fontSize: 11, color: "#666" },
 
-  voteBox: {
-    width: 40,
-    textAlign: "center",
-    cursor: "pointer",
-  },
+  voteBox: { width: 50, textAlign: "center", cursor: "pointer" },
 
-  voteButton: {
-    padding: "6px 10px",
-    border: "none",
-    color: "white",
-    borderRadius: 8,
-    fontSize: 12,
-    cursor: "pointer",
-  },
+  voteButton: { padding: "6px 10px", border: "none", color: "white", borderRadius: 8 },
 
-  modalOverlay: {
+  modalOverlayAnimated: {
     position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    inset: 0,
     background: "rgba(0,0,0,0.5)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
+    animation: "fadeIn 0.2s ease",
   },
 
-  modal: {
+  modalAnimated: {
     background: "white",
     padding: 20,
     borderRadius: 12,
     width: 260,
+    animation: "zoomIn 0.2s ease",
   },
 
   closeBtn: {
-  fontSize: 28,
-  color: "#ef4444",
-  background: "transparent",
-  border: "none",
-  cursor: "pointer",
-  float: "right",
-  fontWeight: "bold",
-  padding: 4,
-},
+    fontSize: 28,
+    color: "#ef4444",
+    background: "transparent",
+    border: "none",
+    float: "right",
+    cursor: "pointer",
+  },
 
   cancelBtn: {
     flex: 1,
     padding: "12px",
-    border: "none",
     background: "#e5e7eb",
+    border: "none",
     borderRadius: 10,
-    fontWeight: "bold",
-    cursor: "pointer",
-    fontSize: 14,
   },
-  
+
   deleteBtn: {
     flex: 1,
     padding: "12px",
-    border: "none",
     background: "#ef4444",
     color: "white",
+    border: "none",
     borderRadius: 10,
-    fontWeight: "bold",
-    cursor: "pointer",
-    fontSize: 14,
   },
 };
