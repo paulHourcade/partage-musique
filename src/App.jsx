@@ -5,6 +5,7 @@ import { db } from "./firebase";
 import {
   addDoc, 
   arrayUnion,
+  arrayRemove ,
   collection,
   deleteDoc,
   doc,
@@ -82,14 +83,21 @@ const voteTrack = async (id) => {
   if (!snap.exists()) return;
 
   const data = snap.data();
+  const hasVoted = data.votedBy?.includes(userId);
 
-  // 🚫 si déjà voté → stop
-  if (data.votedBy?.includes(userId)) return;
-
-  await updateDoc(ref, {
-    votes: increment(1),
-    votedBy: arrayUnion(userId),
-  });
+  if (hasVoted) {
+    // ❌ retirer vote
+    await updateDoc(ref, {
+      votes: increment(-1),
+      votedBy: arrayRemove(userId),
+    });
+  } else {
+    // 👍 ajouter vote
+    await updateDoc(ref, {
+      votes: increment(1),
+      votedBy: arrayUnion(userId),
+    });
+  }
 };
 
   return (
@@ -136,13 +144,9 @@ const voteTrack = async (id) => {
                 </div>
 
                 <div style={styles.actions}>
-                  <button
-                    style={styles.vote}
-                    onClick={() => voteTrack(item.id)}
-                  >
-                    👍 {item.votes || 0}
+                  <button onClick={() => voteTrack(item.id)}>
+                    {item.votedBy?.includes(userId) ? "👎" : "👍"} {item.votes || 0}
                   </button>
-
                   <button
                     style={styles.delete}
                     onClick={() => removeTrack(item.id)}
