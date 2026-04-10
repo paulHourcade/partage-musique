@@ -13,7 +13,6 @@ import {
 } from "firebase/firestore";
 
 export default function App() {
-
   // =========================
   // 🎯 INPUT STATES
   // =========================
@@ -24,19 +23,15 @@ export default function App() {
   // =========================
   // 🎧 SPOTIFY CONFIG
   // =========================
-  const CLIENT_ID = "ffb0cceefeff4104b72ab24ff0ad3d40"; // 
+  const CLIENT_ID = "TON_CLIENT_ID";
 
-  // =========================
-  // 🔎 SEARCH SPOTIFY TRACK
-  // =========================
   const searchSpotifyTrack = async (title, artist) => {
     try {
-      // 🔑 récupération token Spotify
       const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "Authorization": "Basic " + btoa(CLIENT_ID + ":"),
+          Authorization: "Basic " + btoa(CLIENT_ID + ":"),
         },
         body: "grant_type=client_credentials",
       });
@@ -44,7 +39,6 @@ export default function App() {
       const tokenData = await tokenRes.json();
       const accessToken = tokenData.access_token;
 
-      // 🔎 recherche du titre + artiste
       const searchRes = await fetch(
         `https://api.spotify.com/v1/search?q=${title} ${artist}&type=track&limit=1`,
         {
@@ -55,10 +49,7 @@ export default function App() {
       );
 
       const data = await searchRes.json();
-
-      // 🎯 retourne l'id du premier résultat
       return data.tracks.items[0]?.id || null;
-
     } catch (err) {
       console.log("Erreur Spotify:", err);
       return null;
@@ -66,9 +57,8 @@ export default function App() {
   };
 
   // =========================
-  // 🎬 ANIMATION STATES
+  // 🎬 ANIMATIONS
   // =========================
-  const [deletingId, setDeletingId] = useState(null);
   const [animVotes, setAnimVotes] = useState({});
 
   // =========================
@@ -81,29 +71,12 @@ export default function App() {
 
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
-
     if (!id) {
       id = Math.random().toString(36).substring(2, 15);
       localStorage.setItem("userId", id);
     }
-
     return id;
   });
-
-  // =========================
-  // 👆 SWIPE
-  // =========================
-  const [swipeX, setSwipeX] = useState({});
-
-  // =========================
-  // ⚠️ DELETE MODAL
-  // =========================
-  const [trackToDelete, setTrackToDelete] = useState(null);
-
-  // =========================
-  // 👀 VOTE MODAL
-  // =========================
-  const [selectedTrack, setSelectedTrack] = useState(null);
 
   // =========================
   // 🔥 FIREBASE
@@ -129,25 +102,23 @@ export default function App() {
   // =========================
   const handleLogin = () => {
     if (!usernameInput.trim()) return;
-
     setUsername(usernameInput);
     localStorage.setItem("username", usernameInput);
     setUsernameInput("");
   };
 
   // =========================
-  // ➕ ADD TRACK + SPOTIFY
+  // ➕ ADD TRACK
   // =========================
   const addTrack = async () => {
     if (!title.trim()) return;
 
-    // 🔎 récupération spotifyId automatique
     const spotifyId = await searchSpotifyTrack(title, artist);
 
     await addDoc(colRef, {
       title,
       artist: artist || "Unknown",
-      spotifyId: spotifyId || null, // 🔥 stocké en base
+      spotifyId: spotifyId || null,
       createdAt: Date.now(),
       votes: 0,
       votedBy: [],
@@ -158,19 +129,11 @@ export default function App() {
   };
 
   // =========================
-  // ❌ DELETE
-  // =========================
-  const removeTrack = async (id) => {
-    await deleteDoc(doc(db, "tracks", id));
-  };
-
-  // =========================
   // 👍 VOTE
   // =========================
   const handleVote = async (track) => {
     if (!username) return;
 
-    // 🎬 animation vote
     setAnimVotes((prev) => ({ ...prev, [track.id]: true }));
     setTimeout(() => {
       setAnimVotes((prev) => ({ ...prev, [track.id]: false }));
@@ -178,43 +141,20 @@ export default function App() {
 
     const trackRef = doc(db, "tracks", track.id);
 
-    const alreadyVoted = track.votedBy?.some(
-      (v) => v.id === userId
-    );
+    const alreadyVoted = track.votedBy?.some((v) => v.id === userId);
 
     if (alreadyVoted) {
       await updateDoc(trackRef, {
         votes: Math.max((track.votes || 1) - 1, 0),
-        votedBy: (track.votedBy || []).filter(
-          (v) => v.id !== userId
-        ),
+        votedBy: (track.votedBy || []).filter((v) => v.id !== userId),
       });
       return;
     }
 
     await updateDoc(trackRef, {
       votes: (track.votes || 0) + 1,
-      votedBy: [
-        ...(track.votedBy || []),
-        { id: userId, name: username }
-      ],
+      votedBy: [...(track.votedBy || []), { id: userId, name: username }],
     });
-  };
-
-  // =========================
-  // 🧠 CONFIRM DELETE
-  // =========================
-  const confirmDelete = async () => {
-    if (!trackToDelete) return;
-
-    setDeletingId(trackToDelete);
-
-    setTimeout(async () => {
-      await removeTrack(trackToDelete);
-      setDeletingId(null);
-    }, 300);
-
-    setTrackToDelete(null);
   };
 
   // =========================
@@ -223,7 +163,6 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-
         {/* LOGIN */}
         <div style={styles.topBar}>
           {!username ? (
@@ -269,21 +208,18 @@ export default function App() {
         {/* LIST */}
         <div style={styles.list}>
           {tracks.map((item) => {
-
-            const hasVoted = item.votedBy?.some(
-              (v) => v.id === userId
-            );
+            const hasVoted = item.votedBy?.some((v) => v.id === userId);
 
             return (
               <div key={item.id} style={styles.itemRow}>
-
-                {/* 👍 */}
+                {/* VOTES */}
                 <div
                   style={{
                     ...styles.voteBox,
-                    transform: animVotes[item.id] ? "scale(1.3)" : "scale(1)",
+                    transform: animVotes[item.id]
+                      ? "scale(1.3)"
+                      : "scale(1)",
                   }}
-                  onClick={() => setSelectedTrack(item)}
                 >
                   👍 {item.votes || 0}
                 </div>
@@ -293,7 +229,6 @@ export default function App() {
                   <div style={styles.titleText}>{item.title}</div>
                   <div style={styles.artistText}>{item.artist}</div>
 
-                  {/* 🎧 BOUTON SPOTIFY */}
                   {item.spotifyId && (
                     <a
                       href={`https://open.spotify.com/track/${item.spotifyId}`}
@@ -306,7 +241,7 @@ export default function App() {
                   )}
                 </div>
 
-                {/* VOTE */}
+                {/* VOTE BUTTON */}
                 {username && (
                   <button
                     style={{
@@ -315,21 +250,114 @@ export default function App() {
                     }}
                     onClick={() => handleVote(item)}
                   >
-                    {hasVoted ? "Annuler vote" : "Voter"}
+                    {hasVoted ? "Annuler" : "Voter"}
                   </button>
                 )}
-
               </div>
             );
           })}
         </div>
-
       </div>
     </div>
   );
 }
 
+// =========================
+// 🎨 STYLES
+// =========================
 const styles = {
-  page: { padding: 20 },
-  card: { maxWidth: 400, margin: "auto" },
+  page: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    background: "#f1f5f9",
+    fontFamily: "Arial",
+    padding: 12,
+  },
+
+  card: {
+    width: "100%",
+    maxWidth: 420,
+  },
+
+  topBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+
+  loginBox: {
+    display: "flex",
+    gap: 8,
+  },
+
+  title: {
+    textAlign: "center",
+    marginBottom: 20,
+  },
+
+  inputCol: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    marginBottom: 20,
+  },
+
+  input: {
+    padding: 10,
+    borderRadius: 8,
+    border: "1px solid #ddd",
+  },
+
+  button: {
+    padding: 10,
+    borderRadius: 8,
+    border: "none",
+    background: "#2563eb",
+    color: "white",
+    cursor: "pointer",
+  },
+
+  list: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
+
+  itemRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    background: "white",
+    padding: 10,
+    borderRadius: 10,
+  },
+
+  voteBox: {
+    minWidth: 60,
+    textAlign: "center",
+    cursor: "pointer",
+  },
+
+  item: {
+    flex: 1,
+  },
+
+  titleText: {
+    fontWeight: "bold",
+  },
+
+  artistText: {
+    fontSize: 12,
+    color: "#666",
+  },
+
+  voteButton: {
+    padding: "6px 10px",
+    borderRadius: 6,
+    border: "none",
+    color: "white",
+    cursor: "pointer",
+  },
 };
