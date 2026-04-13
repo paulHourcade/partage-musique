@@ -162,6 +162,8 @@ export default function MusicApp() {
   const playerDeviceIdRef = useRef(null);
   const playerReadyRef = useRef(false);
   const tracksRef = useRef([]);
+  const knownTrackIdsRef = useRef(new Set());
+  const didInitTracksRef = useRef(false);
 
   // =========================
   // 🗂️ Références Firestore mémorisées
@@ -414,6 +416,34 @@ useEffect(() => {
 
   useEffect(() => {
     tracksRef.current = tracks;
+  }, [tracks]);
+
+  // =========================
+  // ✨ Animation visuelle quand une musique arrive dans la file
+  // =========================
+  // Cette logique détecte aussi les ajouts faits par d'autres utilisateurs.
+  useEffect(() => {
+    const currentIds = new Set(tracks.map((track) => track.id).filter(Boolean));
+
+    if (!didInitTracksRef.current) {
+      didInitTracksRef.current = true;
+      knownTrackIdsRef.current = currentIds;
+      return;
+    }
+
+    const newIds = tracks
+      .map((track) => track.id)
+      .filter((id) => id && !knownTrackIdsRef.current.has(id));
+
+    if (newIds.length > 0) {
+      setRecentlyAddedIds((prev) => Array.from(new Set([...prev, ...newIds])));
+
+      setTimeout(() => {
+        setRecentlyAddedIds((prev) => prev.filter((id) => !newIds.includes(id)));
+      }, 2600);
+    }
+
+    knownTrackIdsRef.current = currentIds;
   }, [tracks]);
 
   useEffect(() => {
@@ -1868,6 +1898,35 @@ useEffect(() => {
     }
   };
 
+  const handleDragStart = (trackId) => {
+    if (!isAdminUnlocked) return;
+    setDraggedTrackId(trackId);
+    setDragOverTrackId(null);
+  };
+
+  const handleDragEnter = (trackId) => {
+    if (!isAdminUnlocked || !draggedTrackId || draggedTrackId === trackId) return;
+    setDragOverTrackId(trackId);
+  };
+
+  const handleDragEnd = async () => {
+    if (
+      !isAdminUnlocked ||
+      !draggedTrackId ||
+      !dragOverTrackId ||
+      draggedTrackId === dragOverTrackId
+    ) {
+      setDraggedTrackId(null);
+      setDragOverTrackId(null);
+      return;
+    }
+
+    await reorderTracks(draggedTrackId, dragOverTrackId);
+    setDraggedTrackId(null);
+    setDragOverTrackId(null);
+  };
+
+
   // =========================
   // 🖼️ Fonctions de rendu d'éléments UI
   // =========================
@@ -1910,9 +1969,16 @@ useEffect(() => {
     return (
       <div key={trackId} style={styles.swipeWrapper}>
         <div
+          draggable={isAdminQueueItem}
+          onDragStart={isAdminQueueItem ? () => handleDragStart(track.id) : undefined}
+          onDragEnter={isAdminQueueItem ? () => handleDragEnter(track.id) : undefined}
+          onDragOver={isAdminQueueItem ? (e) => e.preventDefault() : undefined}
+          onDragEnd={isAdminQueueItem ? handleDragEnd : undefined}
           style={{
             ...styles.liveQueueItemRow,
             ...(recentlyAddedIds.includes(track.id) ? styles.liveQueueItemAdded : {}),
+            ...(dragOverTrackId === track.id ? styles.liveQueueItemDragOver : {}),
+            ...(draggedTrackId === track.id ? styles.liveQueueItemDragging : {}),
             transform: `translateX(${swipeX[trackId] || 0}px)`,
             opacity: deletingId === track.id ? 0.4 : 1,
           }}
@@ -2064,7 +2130,7 @@ useEffect(() => {
                 style={styles.userMenuButton}
                 onClick={() => setShowUserMenu(true)}
               >
-                👤 {username}
+                {isAdminUnlocked ? "👑" : "👤"} {username}
               </button>
             ) : null}
           </div>
@@ -2378,7 +2444,7 @@ useEffect(() => {
 
             <div style={styles.liveQueueHint}>
               {isAdminUnlocked
-                ? "Glisse à gauche pour supprimer un morceau de la file d’attente."
+                ? "Glisse à gauche pour supprimer un morceau, ou fais un drag & drop pour le remonter dans la file."
                 : "La file d’attente est synchronisée pour tous les utilisateurs."}
             </div>
           </div>
@@ -2505,7 +2571,10 @@ useEffect(() => {
 
             <input
               style={styles.input}
-              type="password"
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
               value={pinInput}
               onChange={(e) => {
                 setPinInput(e.target.value);
@@ -3393,6 +3462,8 @@ const styles = {
     alignItems: "center",
     gap: 10,
     justifyContent: "space-between",
+    transition: "border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, opacity 0.18s ease",
+    cursor: "grab",
     background: "#111827",
     padding: "13px 12px 13px 2px",
     borderRadius: 16,
@@ -3476,6 +3547,16 @@ const styles = {
   liveQueueItemAdded: {
     border: "1px solid rgba(59,130,246,0.55)",
     boxShadow: "0 0 0 1px rgba(59,130,246,0.18), 0 0 18px rgba(59,130,246,0.12)",
+    transform: "scale(1.01)",
+  },
+  liveQueueItemDragging: {
+    opacity: 0.7,
+    transform: "scale(0.985)",
+    boxShadow: "0 0 0 1px rgba(250,204,21,0.24), 0 10px 30px rgba(0,0,0,0.28)",
+  },
+  liveQueueItemDragOver: {
+    border: "1px solid rgba(250,204,21,0.5)",
+    boxShadow: "0 0 0 1px rgba(250,204,21,0.18), 0 0 18px rgba(250,204,21,0.12)",
   },
   historyActionButton: {
     padding: "9px 11px",
