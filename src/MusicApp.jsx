@@ -79,6 +79,8 @@ export default function MusicApp() {
     return localStorage.getItem("isSpotifyAdmin") === "true";
   });
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showSpotifyMenu, setShowSpotifyMenu] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
 
@@ -1807,7 +1809,6 @@ export default function MusicApp() {
         <div style={styles.appHeader}>
           <div style={styles.titleRow}>
             <h1 style={styles.appTitle}>♪ Musique</h1>
-            {username ? <div style={styles.userBadge}>👤 {username}</div> : null}
           </div>
 
           <div style={styles.headerActions}>
@@ -1825,21 +1826,14 @@ export default function MusicApp() {
               </div>
             ) : null}
 
-            {!isAdminUnlocked ? (
+            {username ? (
               <button
-                style={styles.adminGhostButton}
-                onClick={() => {
-                  setShowPinModal(true);
-                  setPinError("");
-                }}
+                style={styles.userMenuButton}
+                onClick={() => setShowUserMenu(true)}
               >
-                Admin Spotify
+                👤 {username}
               </button>
-            ) : (
-              <button style={styles.adminGhostButton} onClick={lockAdminMode}>
-                Quitter admin
-              </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -1864,40 +1858,12 @@ export default function MusicApp() {
 
         {isAdminUnlocked && spotifyUser && (
           <div style={styles.adminConnectedBar}>
-            <div style={styles.spotifyUserBadgeCompact}>
+            <button
+              style={styles.spotifyUserBadgeCompact}
+              onClick={() => setShowSpotifyMenu(true)}
+            >
               <span style={styles.spotifyDot} />
               Spotify connecté : {spotifyUser.display_name || spotifyUser.id}
-            </div>
-
-            <button
-              style={styles.spotifyLogoutButton}
-              onClick={() => {
-                logoutSpotify();
-                setSpotifyToken(null);
-                setSpotifyUser(null);
-                setSpotifyPlayer(null);
-                setPlayerReady(false);
-                setPlayerDeviceId(null);
-                setCurrentPlayback(null);
-                setCurrentPlaybackPosition(0);
-                setCurrentPlaybackDuration(0);
-                clearTimeout(reconnectTimeoutRef.current);
-                reconnectAttemptsRef.current = 0;
-                setPlaybackQueue([]);
-                setCurrentQueueIndex(-1);
-                syncSharedPlayerState({
-                  isPaused: true,
-                  position: 0,
-                  duration: 0,
-                  track: null,
-                  queueIndex: -1,
-                  queueLength: 0,
-                  queueTitle: "",
-                  queue: [],
-                });
-              }}
-            >
-              Déconnecter Spotify
             </button>
           </div>
         )}
@@ -1905,8 +1871,7 @@ export default function MusicApp() {
         <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
           <div style={styles.sectionHeader}>
             <div>
-              <div style={styles.sectionEyebrow}>Contrôles</div>
-              <h2 style={styles.sectionTitle}>Lecteur</h2>
+              <h2 style={styles.sectionTitle}>Contrôles</h2>
             </div>
           </div>
 
@@ -2339,6 +2304,108 @@ export default function MusicApp() {
         </div>
       )}
 
+      {showUserMenu && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <div style={styles.popupHeader}>
+              <div style={styles.modalTitle}>Compte</div>
+              <button
+                style={styles.popupCloseButton}
+                onClick={() => setShowUserMenu(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={styles.popupMenuList}>
+              <button
+                style={styles.popupMenuButton}
+                onClick={() => {
+                  localStorage.removeItem("username");
+                  setShowUserMenu(false);
+                  window.location.reload();
+                }}
+              >
+                Déconnecter l’utilisateur
+              </button>
+
+              {!isAdminUnlocked ? (
+                <button
+                  style={styles.popupMenuButton}
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    setShowPinModal(true);
+                    setPinError("");
+                  }}
+                >
+                  Passer admin
+                </button>
+              ) : (
+                <button
+                  style={styles.popupMenuButton}
+                  onClick={() => {
+                    lockAdminMode();
+                    setShowUserMenu(false);
+                  }}
+                >
+                  Quitter mode admin
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSpotifyMenu && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <div style={styles.popupHeader}>
+              <div style={styles.modalTitle}>Spotify</div>
+              <button
+                style={styles.popupCloseButton}
+                onClick={() => setShowSpotifyMenu(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={styles.popupMenuList}>
+              <button
+                style={styles.popupMenuButton}
+                onClick={() => {
+                  logoutSpotify();
+                  setSpotifyToken(null);
+                  setSpotifyUser(null);
+                  setSpotifyPlayer(null);
+                  setPlayerReady(false);
+                  setPlayerDeviceId(null);
+                  setCurrentPlayback(null);
+                  setCurrentPlaybackPosition(0);
+                  setCurrentPlaybackDuration(0);
+                  clearTimeout(reconnectTimeoutRef.current);
+                  reconnectAttemptsRef.current = 0;
+                  setPlaybackQueue([]);
+                  setCurrentQueueIndex(-1);
+                  setShowSpotifyMenu(false);
+                  syncSharedPlayerState({
+                    isPaused: true,
+                    position: 0,
+                    duration: 0,
+                    track: null,
+                    queueIndex: -1,
+                    queueLength: 0,
+                    queueTitle: "",
+                    queue: [],
+                  });
+                }}
+              >
+                Déconnecter Spotify
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {trackToDelete && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
@@ -2419,15 +2486,18 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
+    minWidth: 0,
   },
   headerActions: {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     justifyContent: "flex-end",
     marginLeft: "auto",
+    marginRight: 0,
+    width: "auto",
   },
   appTitle: {
     margin: 0,
@@ -2512,14 +2582,20 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
   },
-  userBadge: {
-    fontSize: 13,
-    fontWeight: "bold",
+  userMenuButton: {
+    padding: "8px 12px",
+    borderRadius: 999,
+    border: "1px solid rgba(148,163,184,0.22)",
     background: "rgba(15,23,42,0.82)",
     color: "#e2e8f0",
-    border: "1px solid rgba(148,163,184,0.22)",
-    borderRadius: 999,
-    padding: "8px 12px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: 13,
+    marginLeft: "auto",
+    maxWidth: 180,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   inputCol: {
     display: "flex",
@@ -2559,6 +2635,9 @@ const styles = {
     alignItems: "center",
     gap: 10,
     border: "1px solid rgba(16,185,129,0.24)",
+    cursor: "pointer",
+    width: "100%",
+    justifyContent: "flex-start",
   },
   spotifyDot: {
     width: 10,
@@ -3207,6 +3286,39 @@ const styles = {
     fontWeight: "bold",
     boxShadow: "0 12px 30px rgba(0,0,0,0.24)",
     zIndex: 1200,
+  },
+  popupHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  popupCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    border: "1px solid rgba(148,163,184,0.18)",
+    background: "#111827",
+    color: "#f8fafc",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
+  popupMenuList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
+  popupMenuButton: {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(148,163,184,0.18)",
+    background: "rgba(15,23,42,0.82)",
+    color: "#f8fafc",
+    cursor: "pointer",
+    fontWeight: "bold",
+    textAlign: "left",
   },
   homeReturnModule: {
     display: "flex",
