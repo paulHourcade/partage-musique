@@ -9,6 +9,10 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/app" element={<MusicApp />} />
         <Route path="*" element={<NotFound />} />
+        <Route path="/app1" element={<App1 />} />
+        <Route path="/app2" element={<App2 />} />
+        <Route path="/app3" element={<App3 />} />
+        <Route path="/app4" element={<App4 />} />
       </Routes>
     </BrowserRouter>
   );
