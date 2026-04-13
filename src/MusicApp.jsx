@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "./firebase";
+import { Link } from "react-router-dom";
 import {
   fetchSpotifyProfile,
   getSpotifyAccessToken,
@@ -2368,6 +2369,11 @@ export default function MusicApp() {
           </div>
         </div>
       )}
+      <div style={styles.backContainer}>
+        <Link to="/" style={styles.backButton}>
+          ⬅️ Retour à l’accueil
+        </Link>
+      </div>
     </div>
   );
 }
@@ -3207,4 +3213,19 @@ const styles = {
     boxShadow: "0 12px 30px rgba(0,0,0,0.24)",
     zIndex: 1200,
   },
+  backContainer: {
+  marginTop: 40,
+  display: "flex",
+  justifyContent: "center",
+},
+
+backButton: {
+  textDecoration: "none",
+  padding: "12px 18px",
+  borderRadius: 14,
+  background: "rgba(15,23,42,0.85)",
+  border: "1px solid rgba(148,163,184,0.2)",
+  color: "#f8fafc",
+  fontWeight: "bold",
+},
 };
