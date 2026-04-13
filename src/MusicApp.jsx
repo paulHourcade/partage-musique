@@ -2301,6 +2301,15 @@ export default function MusicApp() {
             )
           ) : null}
         </div>
+
+        <Link to="/" style={styles.homeReturnModule}>
+          <div style={styles.homeReturnBadge}>Navigation</div>
+          <div style={styles.homeReturnTitle}>Retour accueil</div>
+          <div style={styles.homeReturnText}>
+            Revenir à la page d’accueil pour ouvrir une autre application.
+          </div>
+          <div style={styles.homeReturnButton}>⬅️ Retour à l’accueil</div>
+        </Link>
       </div>
 
       {toastMessage && <div style={styles.toast}>{toastMessage}</div>}
@@ -2369,11 +2378,6 @@ export default function MusicApp() {
           </div>
         </div>
       )}
-      <div style={styles.backContainer}>
-        <Link to="/" style={styles.backButton}>
-          ⬅️ Retour à l’accueil
-        </Link>
-      </div>
     </div>
   );
 }
@@ -3213,19 +3217,49 @@ const styles = {
     boxShadow: "0 12px 30px rgba(0,0,0,0.24)",
     zIndex: 1200,
   },
-  backContainer: {
-  marginTop: 40,
-  display: "flex",
-  justifyContent: "center",
-},
-
-backButton: {
-  textDecoration: "none",
-  padding: "12px 18px",
-  borderRadius: 14,
-  background: "rgba(15,23,42,0.85)",
-  border: "1px solid rgba(148,163,184,0.2)",
-  color: "#f8fafc",
-  fontWeight: "bold",
-},
+  homeReturnModule: {
+    display: "block",
+    textDecoration: "none",
+    marginTop: 18,
+    marginBottom: 24,
+    borderRadius: 24,
+    padding: 22,
+    background: "rgba(15,23,42,0.82)",
+    border: "1px solid rgba(148,163,184,0.16)",
+    boxShadow: "0 14px 40px rgba(0,0,0,0.24)",
+    color: "#f8fafc",
+  },
+  homeReturnBadge: {
+    display: "inline-flex",
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#d1fae5",
+    background: "rgba(29,185,84,0.12)",
+    border: "1px solid rgba(29,185,84,0.18)",
+    marginBottom: 14,
+  },
+  homeReturnTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  homeReturnText: {
+    color: "#94a3b8",
+    fontSize: 14,
+    lineHeight: 1.6,
+    marginBottom: 18,
+  },
+  homeReturnButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "12px 18px",
+    borderRadius: 14,
+    background: "linear-gradient(135deg, #1DB954, #16a34a)",
+    color: "#ffffff",
+    fontWeight: "bold",
+    boxShadow: "0 10px 22px rgba(29,185,84,0.24)",
+  },
 };
