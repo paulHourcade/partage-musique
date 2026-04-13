@@ -137,8 +137,6 @@ export default function MusicApp() {
   const [touchCurrentX, setTouchCurrentX] = useState({});
   const [trackToDelete, setTrackToDelete] = useState(null);
 
-  const [draggedTrackId, setDraggedTrackId] = useState(null);
-  const [dragOverTrackId, setDragOverTrackId] = useState(null);
 
   // =========================
   // 🧠 Refs techniques
@@ -162,8 +160,6 @@ export default function MusicApp() {
   const playerDeviceIdRef = useRef(null);
   const playerReadyRef = useRef(false);
   const tracksRef = useRef([]);
-  const knownTrackIdsRef = useRef(new Set());
-  const didInitTracksRef = useRef(false);
 
   // =========================
   // 🗂️ Références Firestore mémorisées
@@ -416,34 +412,6 @@ useEffect(() => {
 
   useEffect(() => {
     tracksRef.current = tracks;
-  }, [tracks]);
-
-  // =========================
-  // ✨ Animation visuelle quand une musique arrive dans la file
-  // =========================
-  // Cette logique détecte aussi les ajouts faits par d'autres utilisateurs.
-  useEffect(() => {
-    const currentIds = new Set(tracks.map((track) => track.id).filter(Boolean));
-
-    if (!didInitTracksRef.current) {
-      didInitTracksRef.current = true;
-      knownTrackIdsRef.current = currentIds;
-      return;
-    }
-
-    const newIds = tracks
-      .map((track) => track.id)
-      .filter((id) => id && !knownTrackIdsRef.current.has(id));
-
-    if (newIds.length > 0) {
-      setRecentlyAddedIds((prev) => Array.from(new Set([...prev, ...newIds])));
-
-      setTimeout(() => {
-        setRecentlyAddedIds((prev) => prev.filter((id) => !newIds.includes(id)));
-      }, 2600);
-    }
-
-    knownTrackIdsRef.current = currentIds;
   }, [tracks]);
 
   useEffect(() => {
@@ -1845,33 +1813,18 @@ useEffect(() => {
     }
   };
 
-  const reinjectHistoryTrack = async (item) => {
-    if (!item?.spotifyId) return;
-
-    const syntheticTrack = {
-      id: item.spotifyId,
-      name: item.title,
-      artists: [{ name: item.artist || "Artiste inconnu" }],
-      album: {
-        images: item.albumImage ? [{ url: item.albumImage }] : [],
-      },
-      preview_url: null,
-    };
-
-    await addSpotifyTrackToPlaylist(syntheticTrack);
-  };
-
-  const reorderTracks = async (sourceId, targetId) => {
-    if (!isAdminUnlocked || sourceId === targetId) return;
+  const moveTrackUp = async (trackId) => {
+    if (!isAdminUnlocked) return;
 
     const currentList = [...sortedTracks];
-    const sourceIndex = currentList.findIndex((track) => track.id === sourceId);
-    const targetIndex = currentList.findIndex((track) => track.id === targetId);
+    const sourceIndex = currentList.findIndex((track) => track.id === trackId);
 
-    if (sourceIndex === -1 || targetIndex === -1) return;
+    if (sourceIndex <= 0) return;
 
-    const [moved] = currentList.splice(sourceIndex, 1);
-    currentList.splice(targetIndex, 0, moved);
+    [currentList[sourceIndex - 1], currentList[sourceIndex]] = [
+      currentList[sourceIndex],
+      currentList[sourceIndex - 1],
+    ];
 
     const reordered = currentList.map((track, index) => ({
       ...track,
@@ -1891,39 +1844,27 @@ useEffect(() => {
         await refreshSharedQueueFromTracks(reordered);
       }
 
-      showToast("Playlist réorganisée");
+      showToast("Musique remontée d’un cran");
     } catch (err) {
-      console.error("reorderTracks error:", err);
-      setPlayerError("Impossible de réorganiser la playlist");
+      console.error("moveTrackUp error:", err);
+      setPlayerError("Impossible de remonter cette musique");
     }
   };
 
-  const handleDragStart = (trackId) => {
-    if (!isAdminUnlocked) return;
-    setDraggedTrackId(trackId);
-    setDragOverTrackId(null);
-  };
+  const reinjectHistoryTrack = async (item) => {
+    if (!item?.spotifyId) return;
 
-  const handleDragEnter = (trackId) => {
-    if (!isAdminUnlocked || !draggedTrackId || draggedTrackId === trackId) return;
-    setDragOverTrackId(trackId);
-  };
+    const syntheticTrack = {
+      id: item.spotifyId,
+      name: item.title,
+      artists: [{ name: item.artist || "Artiste inconnu" }],
+      album: {
+        images: item.albumImage ? [{ url: item.albumImage }] : [],
+      },
+      preview_url: null,
+    };
 
-  const handleDragEnd = async () => {
-    if (
-      !isAdminUnlocked ||
-      !draggedTrackId ||
-      !dragOverTrackId ||
-      draggedTrackId === dragOverTrackId
-    ) {
-      setDraggedTrackId(null);
-      setDragOverTrackId(null);
-      return;
-    }
-
-    await reorderTracks(draggedTrackId, dragOverTrackId);
-    setDraggedTrackId(null);
-    setDragOverTrackId(null);
+    await addSpotifyTrackToPlaylist(syntheticTrack);
   };
 
 
@@ -1969,16 +1910,9 @@ useEffect(() => {
     return (
       <div key={trackId} style={styles.swipeWrapper}>
         <div
-          draggable={isAdminQueueItem}
-          onDragStart={isAdminQueueItem ? () => handleDragStart(track.id) : undefined}
-          onDragEnter={isAdminQueueItem ? () => handleDragEnter(track.id) : undefined}
-          onDragOver={isAdminQueueItem ? (e) => e.preventDefault() : undefined}
-          onDragEnd={isAdminQueueItem ? handleDragEnd : undefined}
           style={{
             ...styles.liveQueueItemRow,
             ...(recentlyAddedIds.includes(track.id) ? styles.liveQueueItemAdded : {}),
-            ...(dragOverTrackId === track.id ? styles.liveQueueItemDragOver : {}),
-            ...(draggedTrackId === track.id ? styles.liveQueueItemDragging : {}),
             transform: `translateX(${swipeX[trackId] || 0}px)`,
             opacity: deletingId === track.id ? 0.4 : 1,
           }}
@@ -1990,7 +1924,22 @@ useEffect(() => {
           }
           onTouchEnd={isAdminQueueItem ? () => handleTouchEnd(track.id) : undefined}
         >
-          <div style={styles.liveQueueOrderBox}>{track.order}</div>
+          <div style={styles.liveQueueOrderBox}>
+            {isAdminQueueItem && track.id && track.order > 1 ? (
+              <button
+                style={styles.upArrowButton}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  moveTrackUp(track.id);
+                }}
+                title="Remonter d’un cran"
+              >
+                ⬆️
+              </button>
+            ) : (
+              <span style={styles.queueTopPlaceholder}>•</span>
+            )}
+          </div>
 
           <div style={styles.liveQueueMediaColumn}>
             {image ? (
@@ -2130,7 +2079,7 @@ useEffect(() => {
                 style={styles.userMenuButton}
                 onClick={() => setShowUserMenu(true)}
               >
-                {isAdminUnlocked ? "👑" : "👤"} {username}
+                👤 {username}
               </button>
             ) : null}
           </div>
@@ -2444,7 +2393,7 @@ useEffect(() => {
 
             <div style={styles.liveQueueHint}>
               {isAdminUnlocked
-                ? "Glisse à gauche pour supprimer un morceau, ou fais un drag & drop pour le remonter dans la file."
+                ? "Glisse à gauche pour supprimer un morceau de la file d’attente."
                 : "La file d’attente est synchronisée pour tous les utilisateurs."}
             </div>
           </div>
@@ -2571,10 +2520,7 @@ useEffect(() => {
 
             <input
               style={styles.input}
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoComplete="one-time-code"
+              type="password"
               value={pinInput}
               onChange={(e) => {
                 setPinInput(e.target.value);
@@ -3462,8 +3408,6 @@ const styles = {
     alignItems: "center",
     gap: 10,
     justifyContent: "space-between",
-    transition: "border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, opacity 0.18s ease",
-    cursor: "grab",
     background: "#111827",
     padding: "13px 12px 13px 2px",
     borderRadius: 16,
@@ -3471,17 +3415,34 @@ const styles = {
     border: "1px solid rgba(148,163,184,0.10)",
   },
   liveQueueOrderBox: {
-    minWidth: 20,
+    minWidth: 36,
     marginLeft: -2,
     marginRight: -2,
-    textAlign: "left",
-    fontWeight: "bold",
     userSelect: "none",
-    color: "#86efac",
     alignSelf: "stretch",
     display: "flex",
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  upArrowButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    border: "1px solid rgba(148,163,184,0.18)",
+    background: "rgba(15,23,42,0.9)",
+    color: "#f8fafc",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 14,
+    boxShadow: "0 6px 16px rgba(0,0,0,0.18)",
+  },
+  queueTopPlaceholder: {
+    fontSize: 20,
+    lineHeight: 1,
+    color: "rgba(134,239,172,0.4)",
   },
   liveQueueMediaColumn: {
     display: "flex",
@@ -3547,16 +3508,6 @@ const styles = {
   liveQueueItemAdded: {
     border: "1px solid rgba(59,130,246,0.55)",
     boxShadow: "0 0 0 1px rgba(59,130,246,0.18), 0 0 18px rgba(59,130,246,0.12)",
-    transform: "scale(1.01)",
-  },
-  liveQueueItemDragging: {
-    opacity: 0.7,
-    transform: "scale(0.985)",
-    boxShadow: "0 0 0 1px rgba(250,204,21,0.24), 0 10px 30px rgba(0,0,0,0.28)",
-  },
-  liveQueueItemDragOver: {
-    border: "1px solid rgba(250,204,21,0.5)",
-    boxShadow: "0 0 0 1px rgba(250,204,21,0.18), 0 0 18px rgba(250,204,21,0.12)",
   },
   historyActionButton: {
     padding: "9px 11px",
