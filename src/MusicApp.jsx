@@ -23,10 +23,25 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
+// =========================
+// ⚙️ Constantes globales de l'application
+// =========================
+// ADMIN_PIN : code local permettant d'activer les contrôles admin.
+// SHOW_SUGGESTIONS : active ou masque le module de suggestions avancées.
 const ADMIN_PIN = "1234";
 const SHOW_SUGGESTIONS = false;
 
 export default function MusicApp() {
+  // =========================
+  // 🎵 États principaux de l'application
+  // =========================
+  // Toute la logique de la playlist, du lecteur Spotify et de l'interface
+  // est centralisée dans ce composant principal.
+  // =========================
+  // 📦 Playlist et état partagé
+  // =========================
+  // On charge d'abord le cache local pour garder un affichage rapide,
+  // puis Firestore reprend la main via les listeners temps réel.
   const [tracks, setTracks] = useState(() => {
     try {
       const cached = localStorage.getItem("sharedQueueCache");
@@ -58,6 +73,11 @@ export default function MusicApp() {
   const [currentQueueIndex, setCurrentQueueIndex] = useState(-1);
   const [autoplayEnabled, setAutoplayEnabled] = useState(true);
 
+  // =========================
+  // 🔎 Recherche Spotify
+  // =========================
+  // Ces états pilotent la recherche de morceaux, l'affichage des résultats
+  // et la sélection du titre qui sera ajouté à la file.
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [selectedSpotifyTrackData, setSelectedSpotifyTrackData] = useState(null);
@@ -72,10 +92,18 @@ export default function MusicApp() {
   const [previewingUrl, setPreviewingUrl] = useState("");
   const [recentlyAddedIds, setRecentlyAddedIds] = useState([]);
 
+  // =========================
+  // 🔐 Authentification Spotify
+  // =========================
+  // Token OAuth + profil Spotify du compte connecté pour piloter la lecture.
   const [spotifyToken, setSpotifyToken] = useState(() => getSpotifyAccessToken());
   const [spotifyUser, setSpotifyUser] = useState(null);
   const [spotifyAuthLoading, setSpotifyAuthLoading] = useState(true);
 
+  // =========================
+  // 👑 Mode admin / menus / sécurité locale
+  // =========================
+  // Le statut admin est mémorisé localement tant que l'utilisateur ne le quitte pas.
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
     return localStorage.getItem("isSpotifyAdmin") === "true";
   });
@@ -88,6 +116,11 @@ export default function MusicApp() {
   const [deletingId, setDeletingId] = useState(null);
   const [, setNow] = useState(Date.now());
 
+  // =========================
+  // 👤 Identité utilisateur locale
+  // =========================
+  // username : nom d'affichage visible dans l'app
+  // userId : identifiant local unique servant aussi de clé Firestore pour l'utilisateur.
   const [usernameInput, setUsernameInput] = useState("");
   const [username] = useState(() => localStorage.getItem("username") || "");
   const [userId] = useState(() => {
@@ -107,6 +140,11 @@ export default function MusicApp() {
   const [draggedTrackId, setDraggedTrackId] = useState(null);
   const [dragOverTrackId, setDragOverTrackId] = useState(null);
 
+  // =========================
+  // 🧠 Refs techniques
+  // =========================
+  // On stocke ici des références persistantes qui ne doivent pas provoquer
+  // de rerender : timers, player, état courant, verrouillages, etc.
   const audioPreviewRef = useRef(null);
   const spotifyTimeoutRef = useRef(null);
   const toastTimeoutRef = useRef(null);
@@ -125,6 +163,10 @@ export default function MusicApp() {
   const playerReadyRef = useRef(false);
   const tracksRef = useRef([]);
 
+  // =========================
+  // 🗂️ Références Firestore mémorisées
+  // =========================
+  // useMemo évite de recréer les références à chaque rendu.
   const tracksCollectionRef = useMemo(() => collection(db, "tracks"), []);
   const currentUserDocRef = useMemo(() => doc(db, "users", userId), [userId]);
   const historyCollectionRef = useMemo(() => collection(db, "playHistory"), []);
@@ -134,6 +176,9 @@ export default function MusicApp() {
     [historyCollectionRef]
   );
 
+  // =========================
+  // 🔄 Synchronisation temps réel de la playlist
+  // =========================
   useEffect(() => {
     const unsub = onSnapshot(
       tracksCollectionRef,
@@ -153,6 +198,9 @@ export default function MusicApp() {
     return () => unsub();
   }, [tracksCollectionRef]);
 
+  // =========================
+  // 🕘 Chargement de l'historique des musiques jouées
+  // =========================
   useEffect(() => {
     const unsub = onSnapshot(historyQueryRef, (snapshot) => {
       const freshHistory = snapshot.docs.map((docItem) => ({
@@ -165,6 +213,9 @@ export default function MusicApp() {
     return () => unsub();
   }, [historyQueryRef]);
 
+  // =========================
+  // 👤 Création / mise à jour du profil utilisateur Firestore
+  // =========================
 useEffect(() => {
   if (!username || !userId) return;
 
@@ -191,6 +242,10 @@ useEffect(() => {
   syncUser();
 }, [username, userId, isAdminUnlocked, currentUserDocRef]);
 
+  // =========================
+  // 💓 Heartbeat utilisateur
+  // =========================
+  // On met à jour lastSeen régulièrement pour savoir qui a été actif récemment.
   useEffect(() => {
   if (!username || !userId) return;
 
@@ -210,6 +265,11 @@ useEffect(() => {
 }, [username, userId, isAdminUnlocked, currentUserDocRef]);
 
 
+// =========================
+  // 🚪 Marquage de déconnexion navigateur
+  // =========================
+  // Lors d'une fermeture d'onglet ou d'un démontage, on signale l'utilisateur
+  // comme non connecté dans Firestore.
 useEffect(() => {
   if (!username || !userId) return;
 
@@ -236,33 +296,62 @@ useEffect(() => {
   };
 }, [username, userId, currentUserDocRef]);
 
+  // =========================
+  // 👤 Déconnexion forcée depuis la page admin
+  // =========================
+  // Ce listener surveille le document Firestore de l'utilisateur courant.
+  // Si un admin déclenche une déconnexion à distance, on nettoie la session locale
+  // UNE seule fois, on neutralise le flag Firestore puis on redirige vers l'accueil.
   useEffect(() => {
-  if (!userId) return;
+    if (!userId) return;
 
-  const unsub = onSnapshot(currentUserDocRef, (snapshot) => {
-    if (!snapshot.exists()) return;
+    let handled = false;
 
-    const data = snapshot.data();
+    const unsub = onSnapshot(currentUserDocRef, async (snapshot) => {
+      if (!snapshot.exists()) return;
 
-    if (data?.forceLogoutAt) {
-      localStorage.removeItem("username");
-      localStorage.removeItem("isSpotifyAdmin");
+      const data = snapshot.data();
 
-      setIsAdminUnlocked(false);
-      setSpotifyUser(null);
-      setSpotifyToken(null);
-      setShowPinModal(false);
-      setPinInput("");
-      setPinError("");
+      if (data?.forceLogoutAt && !handled) {
+        handled = true;
 
-      window.location.reload();
-    }
-  });
+        try {
+          await updateDoc(currentUserDocRef, {
+            forceLogoutAt: null,
+            isConnected: false,
+            isAdmin: false,
+          });
+        } catch (err) {
+          console.error("force logout cleanup error:", err);
+        }
 
-  return () => unsub();
-}, [currentUserDocRef]);
+        localStorage.removeItem("username");
+        localStorage.removeItem("isSpotifyAdmin");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("sharedQueueCache");
+
+        setIsAdminUnlocked(false);
+        setSpotifyUser(null);
+        setSpotifyToken(null);
+        setShowPinModal(false);
+        setShowUserMenu(false);
+        setShowSpotifyMenu(false);
+        setPinInput("");
+        setPinError("");
+
+        window.location.href = "/";
+      }
+    });
+
+    return () => unsub();
+  }, [currentUserDocRef, userId]);
+
 
   
+  // =========================
+  // 📡 État partagé du lecteur
+  // =========================
+  // Les autres utilisateurs peuvent lire l'état courant du player via Firestore.
   useEffect(() => {
     const unsub = onSnapshot(playerStateDocRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -275,6 +364,10 @@ useEffect(() => {
     return () => unsub();
   }, [playerStateDocRef]);
 
+  // =========================
+  // ↕️ Tri de la file d'attente
+  // =========================
+  // Tri prioritaire par position, puis par date d'ajout.
   const sortedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
       const positionA =
@@ -445,6 +538,9 @@ useEffect(() => {
     });
   }, [suggestions, suggestionsFilter]);
 
+  // =========================
+  // 🛠️ Fonctions utilitaires d'affichage
+  // =========================
   const formatTimeAgo = (timestamp) => {
     if (!timestamp) return "il y a un moment";
 
@@ -478,6 +574,9 @@ useEffect(() => {
     toastTimeoutRef.current = setTimeout(() => setToastMessage(""), 2500);
   };
 
+  // =========================
+  // 🔐 Actions utilisateur / admin
+  // =========================
   const handleLogin = () => {
     if (!usernameInput.trim()) return;
     const cleanName = usernameInput.trim();
@@ -509,6 +608,9 @@ useEffect(() => {
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  // =========================
+  // 📦 Helpers de construction d'objet pour l'état partagé
+  // =========================
   const buildTrackPayload = (track) => {
     if (!track) return null;
 
@@ -552,6 +654,9 @@ useEffect(() => {
     };
   };
 
+  // =========================
+  // ☁️ Synchronisation du player vers Firestore
+  // =========================
   const syncSharedPlayerState = async (payload) => {
     try {
       await setDoc(
@@ -608,6 +713,9 @@ useEffect(() => {
     });
   };
 
+  // =========================
+  // 🕘 Historique et nettoyage des morceaux lus
+  // =========================
   const addTrackToHistory = async (trackInfo) => {
     if (!trackInfo?.id) return;
     if (historyLoggedTrackRef.current === trackInfo.id) return;
@@ -687,6 +795,9 @@ useEffect(() => {
     }, delay);
   };
 
+  // =========================
+  // 🎧 Initialisation du Spotify Web Playback SDK
+  // =========================
   useEffect(() => {
     if (!spotifyToken || !spotifyUser) return;
 
@@ -974,6 +1085,9 @@ useEffect(() => {
     };
   }, [spotifyPlayer, spotifyToken, spotifyUser]);
 
+  // =========================
+  // ✨ Suggestions automatiques
+  // =========================
   const refreshSuggestions = async () => {
     if (!dominantArtistQuery) {
       setSuggestions([]);
@@ -1079,6 +1193,9 @@ useEffect(() => {
     isPaused,
   ]);
 
+  // =========================
+  // 🔎 Recherche Spotify via ton endpoint serveur
+  // =========================
   const searchSpotify = async (queryText) => {
     if (!queryText || !queryText.trim()) {
       setSearchResults([]);
@@ -1134,6 +1251,10 @@ useEffect(() => {
     return playerDeviceIdRef.current || playerDeviceId || null;
   };
 
+  // =========================
+  // ▶️ Contrôle de lecture Spotify
+  // =========================
+  // Cette fonction transfère la lecture vers le bon device puis lance le morceau.
   const playSpotifyTrack = async (spotifyId, isAuto = false) => {
     if (launchInFlightRef.current) {
       return false;
@@ -1417,6 +1538,9 @@ useEffect(() => {
     }
   };
 
+  // =========================
+  // ➕ Ajout de morceaux dans la file
+  // =========================
   const addSpotifyTrackToPlaylist = async (spotifyTrackData) => {
     if (!spotifyTrackData?.id) {
       setAddError("Sélectionne d’abord un morceau Spotify");
@@ -1612,6 +1736,9 @@ useEffect(() => {
     setTouchCurrentX((prev) => ({ ...prev, [id]: null }));
   };
 
+  // =========================
+  // 🔁 Réparation / réorganisation de la file
+  // =========================
   const relaunchSpotifyPlayer = async () => {
     if (!isAdminUnlocked || !spotifyUser) return;
 
@@ -1741,10 +1868,16 @@ useEffect(() => {
     }
   };
 
+  // =========================
+  // 🖼️ Fonctions de rendu d'éléments UI
+  // =========================
   const renderHistoryItem = (item) => {
     const image = getTrackImage(item);
 
-    return (
+    // =========================
+  // 🧩 Rendu principal de l'interface
+  // =========================
+  return (
       <div key={item.id} style={styles.historyRow}>
         {image ? (
           <img src={image} alt={item.title} style={styles.historyThumb} />
@@ -2532,6 +2665,9 @@ useEffect(() => {
   );
 }
 
+// =========================
+// 🎨 Styles inline de l'application
+// =========================
 const styles = {
   page: {
     minHeight: "100vh",
