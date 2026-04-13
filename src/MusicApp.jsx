@@ -1805,8 +1805,9 @@ export default function MusicApp() {
 
       <div style={styles.card}>
         <div style={styles.appHeader}>
-          <div>
-            <h1 style={styles.appTitle}>Partage Musique</h1>
+          <div style={styles.titleRow}>
+            <h1 style={styles.appTitle}>♪ Musique</h1>
+            {username ? <div style={styles.userBadge}>👤 {username}</div> : null}
           </div>
 
           <div style={styles.headerActions}>
@@ -1822,9 +1823,7 @@ export default function MusicApp() {
                   OK
                 </button>
               </div>
-            ) : (
-              <div style={styles.userBadge}>👤 {username}</div>
-            )}
+            ) : null}
 
             {!isAdminUnlocked ? (
               <button
@@ -1906,97 +1905,8 @@ export default function MusicApp() {
         <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
           <div style={styles.sectionHeader}>
             <div>
-              <div style={styles.sectionEyebrow}>Étape 2</div>
-              <h2 style={styles.sectionTitle}>Lecture en cours</h2>
-            </div>
-          </div>
-
-          <div
-            style={{
-              ...styles.nowPlayingCard,
-              ...(displayedPlayback ? styles.nowPlayingCardActive : {}),
-            }}
-          >
-            {nowPlayingImage ? (
-              <img
-                src={nowPlayingImage}
-                alt={displayedPlayback?.name || "Pochette"}
-                style={styles.nowPlayingImage}
-              />
-            ) : (
-              <div style={styles.nowPlayingImagePlaceholder}>🎵</div>
-            )}
-
-            <div style={styles.nowPlayingContent}>
-              <div style={styles.nowPlayingLabel}>
-                <span style={styles.soundBars}>
-                  <span style={{ ...styles.soundBar, height: 8, opacity: 0.75 }} />
-                  <span style={{ ...styles.soundBar, height: 14 }} />
-                  <span style={{ ...styles.soundBar, height: 10, opacity: 0.85 }} />
-                </span>
-                En cours
-              </div>
-
-              <div style={styles.nowPlayingTitle}>
-                {displayedPlayback?.name || "Aucun morceau en lecture"}
-              </div>
-
-              <div style={styles.nowPlayingArtist}>
-                {displayedPlayback?.artists?.map((a) => a.name).join(", ") ||
-                  "En attente d’une lecture Spotify"}
-              </div>
-
-              <div style={styles.progressMeta}>
-                <span>{formatMs(displayedPlaybackPosition)}</span>
-                <span>{formatMs(displayedPlaybackDuration)}</span>
-              </div>
-
-              <div style={styles.progressBar}>
-                <div
-                  style={{
-                    ...styles.progressBarFill,
-                    width: `${displayedProgressPercent}%`,
-                  }}
-                />
-              </div>
-
-              {isAdminUnlocked ? (
-                <div style={styles.infoText}></div>
-              ) : (
-                <div style={styles.infoText}>
-                  Les commandes de lecture sont réservées à l’admin.
-                </div>
-              )}
-
-              {displayedQueueLength > 0 && displayedQueueIndex >= 0 && (
-                <div style={styles.queueInfoInline}>
-                  File : {displayedQueueIndex + 1}/{displayedQueueLength} ·{" "}
-                  {displayedQueueTitle}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {(playerConnecting || (!playerReady && isAdminUnlocked && spotifyUser)) && (
-            <div style={styles.connectionStateBox}>
-              {playerConnecting ? "Connexion du lecteur..." : "Reconnexion du lecteur..."}
-            </div>
-          )}
-
-          {playerError && <div style={styles.errorText}>{playerError}</div>}
-
-          {isAdminUnlocked && spotifyUser && playerError && (
-            <button style={styles.relaunchButton} onClick={relaunchSpotifyPlayer}>
-              Relancer Spotify
-            </button>
-          )}
-        </div>
-
-        <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <div style={styles.sectionEyebrow}></div>
-              <h2 style={styles.sectionTitle}></h2>
+              <div style={styles.sectionEyebrow}>Contrôles</div>
+              <h2 style={styles.sectionTitle}>Lecteur</h2>
             </div>
           </div>
 
@@ -2052,10 +1962,89 @@ export default function MusicApp() {
                   : "Activer l’enchaînement automatique"}
               </button>
             </div>
-          ) : (
-            <div style={styles.infoText}>
-              Seul l’admin peut gérer le lecteur Spotify.
+          ) : null}
+        </div>
+
+        <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
+          <div style={styles.sectionHeader}>
+            <div>
+              <div style={styles.sectionEyebrow}>Étape 2</div>
+              <h2 style={styles.sectionTitle}>Lecture en cours</h2>
             </div>
+          </div>
+
+          <div
+            style={{
+              ...styles.nowPlayingCard,
+              ...(displayedPlayback ? styles.nowPlayingCardActive : {}),
+            }}
+          >
+            {nowPlayingImage ? (
+              <img
+                src={nowPlayingImage}
+                alt={displayedPlayback?.name || "Pochette"}
+                style={styles.nowPlayingImage}
+              />
+            ) : (
+              <div style={styles.nowPlayingImagePlaceholder}>🎵</div>
+            )}
+
+            <div style={styles.nowPlayingContent}>
+              <div style={styles.nowPlayingLabel}>
+                <span style={styles.soundBars}>
+                  <span style={{ ...styles.soundBar, height: 8, opacity: 0.75 }} />
+                  <span style={{ ...styles.soundBar, height: 14 }} />
+                  <span style={{ ...styles.soundBar, height: 10, opacity: 0.85 }} />
+                </span>
+                En cours
+              </div>
+
+              <div style={styles.nowPlayingTitle}>
+                {displayedPlayback?.name || "Aucun morceau en lecture"}
+              </div>
+
+              <div style={styles.nowPlayingArtist}>
+                {displayedPlayback?.artists?.map((a) => a.name).join(", ") ||
+                  "En attente d’une lecture Spotify"}
+              </div>
+
+              <div style={styles.progressMeta}>
+                <span>{formatMs(displayedPlaybackPosition)}</span>
+                <span>{formatMs(displayedPlaybackDuration)}</span>
+              </div>
+
+              <div style={styles.progressBar}>
+                <div
+                  style={{
+                    ...styles.progressBarFill,
+                    width: `${displayedProgressPercent}%`,
+                  }}
+                />
+              </div>
+
+              
+
+              {displayedQueueLength > 0 && displayedQueueIndex >= 0 && (
+                <div style={styles.queueInfoInline}>
+                  File : {displayedQueueIndex + 1}/{displayedQueueLength} ·{" "}
+                  {displayedQueueTitle}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {(playerConnecting || (!playerReady && isAdminUnlocked && spotifyUser)) && (
+            <div style={styles.connectionStateBox}>
+              {playerConnecting ? "Connexion du lecteur..." : "Reconnexion du lecteur..."}
+            </div>
+          )}
+
+          {playerError && <div style={styles.errorText}>{playerError}</div>}
+
+          {isAdminUnlocked && spotifyUser && playerError && (
+            <button style={styles.relaunchButton} onClick={relaunchSpotifyPlayer}>
+              Relancer Spotify
+            </button>
           )}
         </div>
 
@@ -2303,11 +2292,6 @@ export default function MusicApp() {
         </div>
 
         <Link to="/" style={styles.homeReturnModule}>
-          <div style={styles.homeReturnBadge}>Navigation</div>
-          <div style={styles.homeReturnTitle}>Retour accueil</div>
-          <div style={styles.homeReturnText}>
-            Revenir à la page d’accueil pour ouvrir une autre application.
-          </div>
           <div style={styles.homeReturnButton}>⬅️ Retour à l’accueil</div>
         </Link>
       </div>
@@ -2426,9 +2410,15 @@ const styles = {
   appHeader: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 12,
     marginBottom: 18,
+    flexWrap: "wrap",
+  },
+  titleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
     flexWrap: "wrap",
   },
   headerActions: {
@@ -2437,6 +2427,7 @@ const styles = {
     gap: 10,
     flexWrap: "wrap",
     justifyContent: "flex-end",
+    marginLeft: "auto",
   },
   appTitle: {
     margin: 0,
@@ -2528,7 +2519,7 @@ const styles = {
     color: "#e2e8f0",
     border: "1px solid rgba(148,163,184,0.22)",
     borderRadius: 999,
-    padding: "10px 14px",
+    padding: "8px 12px",
   },
   inputCol: {
     display: "flex",
@@ -3218,12 +3209,13 @@ const styles = {
     zIndex: 1200,
   },
   homeReturnModule: {
-    display: "block",
+    display: "flex",
+    justifyContent: "center",
     textDecoration: "none",
     marginTop: 18,
     marginBottom: 24,
     borderRadius: 24,
-    padding: 22,
+    padding: 18,
     background: "rgba(15,23,42,0.82)",
     border: "1px solid rgba(148,163,184,0.16)",
     boxShadow: "0 14px 40px rgba(0,0,0,0.24)",
