@@ -20,6 +20,7 @@ import {
   writeBatch,
   limit,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 
 const ADMIN_PIN = "1234";
@@ -125,6 +126,7 @@ export default function MusicApp() {
   const tracksRef = useRef([]);
 
   const tracksCollectionRef = useMemo(() => collection(db, "tracks"), []);
+  const currentUserDocRef = useMemo(() => doc(db, "users", userId), [userId]);
   const historyCollectionRef = useMemo(() => collection(db, "playHistory"), []);
   const playerStateDocRef = useMemo(() => doc(db, "appState", "playerState"), []);
   const historyQueryRef = useMemo(
@@ -163,6 +165,104 @@ export default function MusicApp() {
     return () => unsub();
   }, [historyQueryRef]);
 
+useEffect(() => {
+  if (!username || !userId) return;
+
+  const syncUser = async () => {
+    try {
+      await setDoc(
+        currentUserDocRef,
+        {
+          userId,
+          name: username,
+          isAdmin: isAdminUnlocked,
+          connectedAt: Date.now(),
+          lastSeen: Date.now(),
+          isConnected: true,
+          forceLogoutAt: null,
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("user sync error:", err);
+    }
+  };
+
+  syncUser();
+}, [username, userId, isAdminUnlocked, currentUserDocRef]);
+
+  useEffect(() => {
+  if (!username || !userId) return;
+
+  const interval = setInterval(async () => {
+    try {
+      await updateDoc(currentUserDocRef, {
+        lastSeen: Date.now(),
+        isConnected: true,
+        isAdmin: isAdminUnlocked,
+      });
+    } catch (err) {
+      console.error("lastSeen update error:", err);
+    }
+  }, 60000);
+
+  return () => clearInterval(interval);
+}, [username, userId, isAdminUnlocked, currentUserDocRef]);
+
+
+useEffect(() => {
+  if (!username || !userId) return;
+
+  const markDisconnected = async () => {
+    try {
+      await updateDoc(currentUserDocRef, {
+        isConnected: false,
+        lastSeen: Date.now(),
+      });
+    } catch (err) {
+      console.error("disconnect mark error:", err);
+    }
+  };
+
+  const handleBeforeUnload = () => {
+    markDisconnected();
+  };
+
+  window.addEventListener("beforeunload", handleBeforeUnload);
+
+  return () => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+    markDisconnected();
+  };
+}, [username, userId, currentUserDocRef]);
+
+  useEffect(() => {
+  if (!userId) return;
+
+  const unsub = onSnapshot(currentUserDocRef, (snapshot) => {
+    if (!snapshot.exists()) return;
+
+    const data = snapshot.data();
+
+    if (data?.forceLogoutAt) {
+      localStorage.removeItem("username");
+      localStorage.removeItem("isSpotifyAdmin");
+
+      setIsAdminUnlocked(false);
+      setSpotifyUser(null);
+      setSpotifyToken(null);
+      setShowPinModal(false);
+      setPinInput("");
+      setPinError("");
+
+      window.location.reload();
+    }
+  });
+
+  return () => unsub();
+}, [currentUserDocRef]);
+
+  
   useEffect(() => {
     const unsub = onSnapshot(playerStateDocRef, (snapshot) => {
       if (snapshot.exists()) {
