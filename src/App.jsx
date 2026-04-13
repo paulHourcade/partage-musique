@@ -12,11 +12,11 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/app" element={<MusicApp />} />
-        <Route path="*" element={<NotFound />} />
         <Route path="/app1" element={<App1 />} />
         <Route path="/app2" element={<App2 />} />
         <Route path="/app3" element={<App3 />} />
         <Route path="/app4" element={<App4 />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );
@@ -33,16 +33,13 @@ function NotFound() {
         </p>
 
         <div style={styles.actions}>
+          <Link to="/" style={{ ...styles.button, ...styles.primaryButton }}>
+            Retour à l’accueil
+          </Link>
           <Link to="/app" style={{ ...styles.button, ...styles.secondaryButton }}>
             Ouvrir l’appli musique
           </Link>
         </div>
-      </div>
-
-      <div style={styles.bottomFixed}>
-        <Link to="/" style={{ ...styles.button, ...styles.primaryButton }}>
-          ⬅️ Retour à l’accueil
-        </Link>
       </div>
     </div>
   );
@@ -116,11 +113,5 @@ const styles = {
     color: "#e2e8f0",
     background: "rgba(15,23,42,0.85)",
     border: "1px solid rgba(148,163,184,0.18)",
-  },
-  bottomFixed: {
-    position: "fixed",
-    bottom: 20,
-    left: "50%",
-    transform: "translateX(-50%)",
   },
 };
