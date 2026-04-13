@@ -6,6 +6,8 @@ import App2 from "./App2.jsx";
 import App3 from "./App3.jsx";
 import App4 from "./App4.jsx";
 import ScrollToTop from "./ScrollToTop.jsx";
+import AdminUsers from "./AdminUsers.jsx";
+
 
 export default function App() {
   return (
@@ -20,6 +22,7 @@ export default function App() {
         <Route path="/app3" element={<App3 />} />
         <Route path="/app4" element={<App4 />} />
         <Route path="*" element={<NotFound />} />
+        <Route path="/admin-users" element={<AdminUsers />} />
       </Routes>
     </BrowserRouter>
   );
