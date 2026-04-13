@@ -6,7 +6,7 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  orderBy, 
+  orderBy,
   query,
   setDoc,
   updateDoc,
@@ -273,8 +273,22 @@ export default function AdminUsers() {
 
           <div style={styles.userContent}>
             <div style={styles.userNameRow}>
-              <div style={styles.userName}>
-                {user.name || "Sans nom"} {isCurrentUser ? "(toi)" : ""}
+              <div style={styles.userTopLine}>
+                <div style={styles.userName}>
+                  {user.name || "Sans nom"} {isCurrentUser ? "(toi)" : ""}
+                </div>
+
+                {isAdminUnlocked ? (
+                  <button
+                    style={styles.disconnectButtonInline}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      forceLogoutUser(user.id);
+                    }}
+                  >
+                    Déconnecter
+                  </button>
+                ) : null}
               </div>
 
               <div
@@ -283,7 +297,7 @@ export default function AdminUsers() {
                   ...(user.isConnected ? styles.statusOnline : styles.statusOffline),
                 }}
               >
-                {user.isConnected ? "Connecté" : "Hors ligne"}
+                {user.isConnected ? "En ligne" : "Hors ligne"}
               </div>
             </div>
 
@@ -295,18 +309,6 @@ export default function AdminUsers() {
               Admin : {user.isAdmin ? "Oui" : "Non"}
             </div>
           </div>
-
-          {isAdminUnlocked ? (
-            <button
-              style={styles.disconnectButton}
-              onClick={(e) => {
-                e.stopPropagation();
-                forceLogoutUser(user.id);
-              }}
-            >
-              Déconnecter
-            </button>
-          ) : null}
         </div>
       </div>
     );
@@ -350,7 +352,6 @@ export default function AdminUsers() {
         <div style={styles.sectionCard}>
           <div style={styles.sectionHeader}>
             <div>
-              <div style={styles.sectionEyebrow}>Admin</div>
               <h2 style={styles.sectionTitle}>Liste des utilisateurs</h2>
             </div>
           </div>
@@ -362,10 +363,6 @@ export default function AdminUsers() {
           ) : (
             <div style={styles.infoText}>Aucun utilisateur trouvé.</div>
           )}
-
-          <div style={styles.infoText}>
-            Triés du plus récent au plus ancien.
-          </div>
         </div>
 
         <div style={styles.homeReturnModule}>
@@ -571,14 +568,6 @@ const styles = {
     gap: 12,
     marginBottom: 14,
   },
-  sectionEyebrow: {
-    color: "#94a3b8",
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 4,
-    fontWeight: "bold",
-  },
   sectionTitle: {
     margin: 0,
     fontSize: 20,
@@ -664,6 +653,11 @@ const styles = {
   },
   userNameRow: {
     display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  userTopLine: {
+    display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
@@ -686,6 +680,7 @@ const styles = {
     fontSize: 11,
     fontWeight: "bold",
     whiteSpace: "nowrap",
+    alignSelf: "flex-start",
   },
   statusOnline: {
     background: "rgba(16,185,129,0.12)",
@@ -697,15 +692,16 @@ const styles = {
     color: "#cbd5e1",
     border: "1px solid rgba(148,163,184,0.22)",
   },
-  disconnectButton: {
-    padding: "10px 12px",
-    borderRadius: 12,
+  disconnectButtonInline: {
+    padding: "8px 10px",
+    borderRadius: 10,
     border: "none",
     background: "rgba(239,68,68,0.16)",
     color: "#fecaca",
     cursor: "pointer",
     fontWeight: "bold",
     flexShrink: 0,
+    fontSize: 12,
   },
   infoText: {
     fontSize: 12,
