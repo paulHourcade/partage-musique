@@ -1867,15 +1867,14 @@ export default function MusicApp() {
             </button>
           </div>
         )}
-
-        <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h2 style={styles.sectionTitle}>Contrôles</h2>
+        {isAdminUnlocked && (
+          <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <h2 style={styles.sectionTitle}>Contrôles</h2>
+              </div>
             </div>
-          </div>
-
-          {isAdminUnlocked ? (
+        
             <div style={styles.playerControlsBlock}>
               <div style={styles.playerControlsRow}>
                 <button
@@ -1885,7 +1884,7 @@ export default function MusicApp() {
                 >
                   ▶ Lire musique
                 </button>
-
+        
                 <button
                   style={{
                     ...styles.iconButton,
@@ -1896,7 +1895,7 @@ export default function MusicApp() {
                 >
                   ⏸
                 </button>
-
+        
                 <button
                   style={{
                     ...styles.iconButton,
@@ -1908,7 +1907,7 @@ export default function MusicApp() {
                 >
                   ▶
                 </button>
-
+        
                 <button
                   style={styles.iconButton}
                   onClick={playNextTrack}
@@ -1917,7 +1916,7 @@ export default function MusicApp() {
                   ⏭
                 </button>
               </div>
-
+        
               <button
                 style={styles.secondaryButton}
                 onClick={() => setAutoplayEnabled((prev) => !prev)}
@@ -1927,8 +1926,8 @@ export default function MusicApp() {
                   : "Activer l’enchaînement automatique"}
               </button>
             </div>
-          ) : null}
-        </div>
+          </div>
+        )}
 
         <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
           <div style={styles.sectionHeader}>
