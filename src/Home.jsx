@@ -11,26 +11,21 @@ export default function Home() {
           <div style={styles.badge}>Accueil</div>
           <h1 style={styles.title}>♪ Musique</h1>
           <p style={styles.subtitle}>
-            Choisis un espace pour lancer ton application principale, accéder à
-            l’administration ou ouvrir tes pages de test.
+            Accède à ton application principale, à l’administration et à tes espaces de test.
           </p>
         </div>
 
-        <div style={styles.mainGrid}>
-          <Link to="/app" style={{ ...styles.mainCard, ...styles.musicCard }}>
-            <div style={styles.mainCardTop}>
-              <div style={styles.mainEmoji}>🎵</div>
-              <div style={styles.mainTitle}>Ouvrir l’appli musique</div>
-            </div>
-            <div style={styles.mainText}>
-              Accéder directement à la playlist partagée et à la lecture en cours.
-            </div>
-            <div style={styles.mainAction}>Ouvrir maintenant</div>
+        <div style={styles.stack}>
+          <Link to="/app" style={{ ...styles.moduleCard, ...styles.musicAccessCard }}>
+            <div style={styles.moduleEmoji}>🎵</div>
+            <div style={styles.moduleTitle}>Accéder à l’appli musique</div>
+            <div style={styles.moduleAction}>Ouvrir maintenant</div>
           </Link>
 
-          <Link to="/admin-users" style={styles.adminCard}>
-            <div style={styles.adminEmoji}>⚙️</div>
-            <div style={styles.adminTitle}>Administration</div>
+          <Link to="/admin-users" style={styles.moduleCard}>
+            <div style={styles.moduleEmoji}>⚙️</div>
+            <div style={styles.moduleTitle}>Administration</div>
+            <div style={styles.moduleAction}>Accéder</div>
           </Link>
         </div>
 
@@ -94,7 +89,7 @@ const styles = {
   },
   shell: {
     width: "100%",
-    maxWidth: 980,
+    maxWidth: 760,
     margin: "0 auto",
     position: "relative",
     zIndex: 1,
@@ -106,7 +101,7 @@ const styles = {
     border: "1px solid rgba(148,163,184,0.18)",
     boxShadow: "0 20px 60px rgba(0,0,0,0.34)",
     backdropFilter: "blur(10px)",
-    marginBottom: 22,
+    marginBottom: 20,
     textAlign: "center",
   },
   badge: {
@@ -131,21 +126,21 @@ const styles = {
     color: "#94a3b8",
     fontSize: 16,
     lineHeight: 1.7,
-    maxWidth: 680,
+    maxWidth: 560,
     marginInline: "auto",
   },
-  mainGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 2fr) minmax(220px, 1fr)",
+  stack: {
+    display: "flex",
+    flexDirection: "column",
     gap: 16,
     marginBottom: 18,
   },
-  mainCard: {
+  moduleCard: {
     textDecoration: "none",
     color: "#f8fafc",
-    borderRadius: 28,
-    padding: 26,
-    minHeight: 220,
+    borderRadius: 26,
+    padding: 24,
+    minHeight: 150,
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
@@ -153,67 +148,25 @@ const styles = {
     border: "1px solid rgba(148,163,184,0.16)",
     boxShadow: "0 14px 40px rgba(0,0,0,0.24)",
   },
-  musicCard: {
+  musicAccessCard: {
     background:
       "linear-gradient(135deg, rgba(29,185,84,0.18), rgba(15,23,42,0.94), rgba(15,23,42,0.92))",
     border: "1px solid rgba(29,185,84,0.28)",
     boxShadow: "0 18px 50px rgba(29,185,84,0.14)",
   },
-  mainCardTop: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
+  moduleEmoji: {
+    fontSize: 38,
+    marginBottom: 14,
   },
-  mainEmoji: {
-    fontSize: 42,
-  },
-  mainTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    lineHeight: 1.1,
-  },
-  mainText: {
-    color: "#cbd5e1",
-    fontSize: 15,
-    lineHeight: 1.6,
-    maxWidth: 520,
-  },
-  mainAction: {
-    marginTop: 18,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "fit-content",
-    padding: "14px 18px",
-    borderRadius: 16,
-    fontWeight: "bold",
-    color: "#ffffff",
-    background: "linear-gradient(135deg, #1DB954, #16a34a)",
-    boxShadow: "0 10px 22px rgba(29,185,84,0.24)",
-  },
-  adminCard: {
-    textDecoration: "none",
-    color: "#f8fafc",
-    borderRadius: 28,
-    padding: 26,
-    minHeight: 220,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    textAlign: "center",
-    background: "rgba(15,23,42,0.82)",
-    border: "1px solid rgba(148,163,184,0.16)",
-    boxShadow: "0 14px 40px rgba(0,0,0,0.24)",
-  },
-  adminEmoji: {
-    fontSize: 42,
-    marginBottom: 16,
-  },
-  adminTitle: {
+  moduleTitle: {
     fontSize: 24,
     fontWeight: "bold",
     lineHeight: 1.2,
+  },
+  moduleAction: {
+    marginTop: 18,
+    fontWeight: "bold",
+    color: "#d1fae5",
   },
   appsSection: {
     borderRadius: 26,
