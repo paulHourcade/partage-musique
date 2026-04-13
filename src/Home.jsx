@@ -7,14 +7,6 @@ export default function Home() {
       <div style={styles.glowBottom} />
 
       <div style={styles.shell}>
-        <div style={styles.heroCard}>
-          <div style={styles.badge}>Accueil</div>
-          <h1 style={styles.title}>♪ Musique</h1>
-          <p style={styles.subtitle}>
-            Accède à ton application principale, à l’administration et à tes espaces de test.
-          </p>
-        </div>
-
         <div style={styles.stack}>
           <Link to="/app" style={{ ...styles.moduleCard, ...styles.musicAccessCard }}>
             <div style={styles.moduleEmoji}>🎵</div>
@@ -93,41 +85,6 @@ const styles = {
     margin: "0 auto",
     position: "relative",
     zIndex: 1,
-  },
-  heroCard: {
-    borderRadius: 32,
-    padding: 30,
-    background: "rgba(15,23,42,0.82)",
-    border: "1px solid rgba(148,163,184,0.18)",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.34)",
-    backdropFilter: "blur(10px)",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  badge: {
-    display: "inline-flex",
-    padding: "8px 12px",
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#d1fae5",
-    background: "rgba(29,185,84,0.12)",
-    border: "1px solid rgba(29,185,84,0.18)",
-    marginBottom: 16,
-  },
-  title: {
-    margin: 0,
-    fontSize: 46,
-    lineHeight: 1,
-  },
-  subtitle: {
-    marginTop: 16,
-    marginBottom: 0,
-    color: "#94a3b8",
-    fontSize: 16,
-    lineHeight: 1.7,
-    maxWidth: 560,
-    marginInline: "auto",
   },
   stack: {
     display: "flex",
