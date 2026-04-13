@@ -1,5 +1,9 @@
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
-const REDIRECT_URI = "https://partage-musique.vercel.app";
+const REDIRECT_URI =
+  window.location.hostname === "localhost"
+    ? "http://localhost:5173/app"
+    : "https://partage-musique.vercel.app/app";
+
 const SCOPES = [
   "streaming",
   "user-read-email",
@@ -121,7 +125,10 @@ export async function handleSpotifyCallback() {
     localStorage.setItem("spotify_expires_at", String(expiresAt));
   }
 
-  window.history.replaceState({}, document.title, window.location.pathname);
+  localStorage.removeItem("spotify_code_verifier");
+  localStorage.removeItem("spotify_auth_state");
+
+  window.history.replaceState({}, document.title, "/app");
 
   return data.access_token;
 }
@@ -136,6 +143,8 @@ export function logoutSpotify() {
   localStorage.removeItem("spotify_expires_at");
   localStorage.removeItem("spotify_code_verifier");
   localStorage.removeItem("spotify_auth_state");
+
+  window.history.replaceState({}, document.title, "/app");
 }
 
 export async function fetchSpotifyProfile(token) {
