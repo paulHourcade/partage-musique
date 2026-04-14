@@ -2385,11 +2385,14 @@ export default function MusicApp() {
         </div>
       </div>
 
-              <div style={styles.homeReturnModule}>
-          <Link to="/" style={styles.homeReturnButton}>
-            ⬅️ Retour à l’accueil
-          </Link>
-        </div>
+      <div style={styles.bottomReturnWrap}>
+        <button
+          onClick={() => navigate("/")}
+          style={styles.bottomReturnButton}
+        >
+          ← Retour à l’accueil
+        </button>
+      </div>
 
       {toastMessage && <div style={styles.toast}>{toastMessage}</div>}
 
