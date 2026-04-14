@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "./firebase";
-import { Link } from "react-router-dom";
 import {
   fetchSpotifyProfile,
   getSpotifyAccessToken,
@@ -20,28 +19,12 @@ import {
   writeBatch,
   limit,
   setDoc,
-  updateDoc,
 } from "firebase/firestore";
 
-// =========================
-// ⚙️ Constantes globales de l'application
-// =========================
-// ADMIN_PIN : code local permettant d'activer les contrôles admin.
-// SHOW_SUGGESTIONS : active ou masque le module de suggestions avancées.
 const ADMIN_PIN = "1234";
 const SHOW_SUGGESTIONS = false;
 
 export default function MusicApp() {
-  // =========================
-  // 🎵 États principaux de l'application
-  // =========================
-  // Toute la logique de la playlist, du lecteur Spotify et de l'interface
-  // est centralisée dans ce composant principal.
-  // =========================
-  // 📦 Playlist et état partagé
-  // =========================
-  // On charge d'abord le cache local pour garder un affichage rapide,
-  // puis Firestore reprend la main via les listeners temps réel.
   const [tracks, setTracks] = useState(() => {
     try {
       const cached = localStorage.getItem("sharedQueueCache");
@@ -73,11 +56,6 @@ export default function MusicApp() {
   const [currentQueueIndex, setCurrentQueueIndex] = useState(-1);
   const [autoplayEnabled, setAutoplayEnabled] = useState(true);
 
-  // =========================
-  // 🔎 Recherche Spotify
-  // =========================
-  // Ces états pilotent la recherche de morceaux, l'affichage des résultats
-  // et la sélection du titre qui sera ajouté à la file.
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [selectedSpotifyTrackData, setSelectedSpotifyTrackData] = useState(null);
@@ -92,35 +70,20 @@ export default function MusicApp() {
   const [previewingUrl, setPreviewingUrl] = useState("");
   const [recentlyAddedIds, setRecentlyAddedIds] = useState([]);
 
-  // =========================
-  // 🔐 Authentification Spotify
-  // =========================
-  // Token OAuth + profil Spotify du compte connecté pour piloter la lecture.
   const [spotifyToken, setSpotifyToken] = useState(() => getSpotifyAccessToken());
   const [spotifyUser, setSpotifyUser] = useState(null);
   const [spotifyAuthLoading, setSpotifyAuthLoading] = useState(true);
 
-  // =========================
-  // 👑 Mode admin / menus / sécurité locale
-  // =========================
-  // Le statut admin est mémorisé localement tant que l'utilisateur ne le quitte pas.
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
     return localStorage.getItem("isSpotifyAdmin") === "true";
   });
   const [showPinModal, setShowPinModal] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showSpotifyMenu, setShowSpotifyMenu] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
 
   const [deletingId, setDeletingId] = useState(null);
   const [, setNow] = useState(Date.now());
 
-  // =========================
-  // 👤 Identité utilisateur locale
-  // =========================
-  // username : nom d'affichage visible dans l'app
-  // userId : identifiant local unique servant aussi de clé Firestore pour l'utilisateur.
   const [usernameInput, setUsernameInput] = useState("");
   const [username] = useState(() => localStorage.getItem("username") || "");
   const [userId] = useState(() => {
@@ -137,12 +100,9 @@ export default function MusicApp() {
   const [touchCurrentX, setTouchCurrentX] = useState({});
   const [trackToDelete, setTrackToDelete] = useState(null);
 
+  const [draggedTrackId, setDraggedTrackId] = useState(null);
+  const [dragOverTrackId, setDragOverTrackId] = useState(null);
 
-  // =========================
-  // 🧠 Refs techniques
-  // =========================
-  // On stocke ici des références persistantes qui ne doivent pas provoquer
-  // de rerender : timers, player, état courant, verrouillages, etc.
   const audioPreviewRef = useRef(null);
   const spotifyTimeoutRef = useRef(null);
   const toastTimeoutRef = useRef(null);
@@ -160,13 +120,11 @@ export default function MusicApp() {
   const playerDeviceIdRef = useRef(null);
   const playerReadyRef = useRef(false);
   const tracksRef = useRef([]);
+  const searchAbortRef = useRef(null);
+  const searchCacheRef = useRef(new Map());
+  const latestSearchRef = useRef("");
 
-  // =========================
-  // 🗂️ Références Firestore mémorisées
-  // =========================
-  // useMemo évite de recréer les références à chaque rendu.
   const tracksCollectionRef = useMemo(() => collection(db, "tracks"), []);
-  const currentUserDocRef = useMemo(() => doc(db, "users", userId), [userId]);
   const historyCollectionRef = useMemo(() => collection(db, "playHistory"), []);
   const playerStateDocRef = useMemo(() => doc(db, "appState", "playerState"), []);
   const historyQueryRef = useMemo(
@@ -174,9 +132,6 @@ export default function MusicApp() {
     [historyCollectionRef]
   );
 
-  // =========================
-  // 🔄 Synchronisation temps réel de la playlist
-  // =========================
   useEffect(() => {
     const unsub = onSnapshot(
       tracksCollectionRef,
@@ -196,9 +151,6 @@ export default function MusicApp() {
     return () => unsub();
   }, [tracksCollectionRef]);
 
-  // =========================
-  // 🕘 Chargement de l'historique des musiques jouées
-  // =========================
   useEffect(() => {
     const unsub = onSnapshot(historyQueryRef, (snapshot) => {
       const freshHistory = snapshot.docs.map((docItem) => ({
@@ -211,145 +163,6 @@ export default function MusicApp() {
     return () => unsub();
   }, [historyQueryRef]);
 
-  // =========================
-  // 👤 Création / mise à jour du profil utilisateur Firestore
-  // =========================
-useEffect(() => {
-  if (!username || !userId) return;
-
-  const syncUser = async () => {
-    try {
-      await setDoc(
-        currentUserDocRef,
-        {
-          userId,
-          name: username,
-          isAdmin: isAdminUnlocked,
-          connectedAt: Date.now(),
-          lastSeen: Date.now(),
-          isConnected: true,
-          forceLogoutAt: null,
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      console.error("user sync error:", err);
-    }
-  };
-
-  syncUser();
-}, [username, userId, isAdminUnlocked, currentUserDocRef]);
-
-  // =========================
-  // 💓 Heartbeat utilisateur
-  // =========================
-  // On met à jour lastSeen régulièrement pour savoir qui a été actif récemment.
-  useEffect(() => {
-  if (!username || !userId) return;
-
-  const interval = setInterval(async () => {
-    try {
-      await updateDoc(currentUserDocRef, {
-        lastSeen: Date.now(),
-        isConnected: true,
-        isAdmin: isAdminUnlocked,
-      });
-    } catch (err) {
-      console.error("lastSeen update error:", err);
-    }
-  }, 60000);
-
-  return () => clearInterval(interval);
-}, [username, userId, isAdminUnlocked, currentUserDocRef]);
-
-
-// =========================
-  // 🚪 Marquage de déconnexion navigateur
-  // =========================
-  // Lors d'une fermeture d'onglet ou d'un démontage, on signale l'utilisateur
-  // comme non connecté dans Firestore.
-useEffect(() => {
-  if (!username || !userId) return;
-
-  const markDisconnected = async () => {
-    try {
-      await updateDoc(currentUserDocRef, {
-        isConnected: false,
-        lastSeen: Date.now(),
-      });
-    } catch (err) {
-      console.error("disconnect mark error:", err);
-    }
-  };
-
-  const handleBeforeUnload = () => {
-    markDisconnected();
-  };
-
-  window.addEventListener("beforeunload", handleBeforeUnload);
-
-  return () => {
-    window.removeEventListener("beforeunload", handleBeforeUnload);
-    markDisconnected();
-  };
-}, [username, userId, currentUserDocRef]);
-
-  // =========================
-  // 👤 Déconnexion forcée depuis la page admin
-  // =========================
-  // Ce listener surveille le document Firestore de l'utilisateur courant.
-  // Si un admin déclenche une déconnexion à distance, on nettoie la session locale
-  // UNE seule fois, on neutralise le flag Firestore puis on redirige vers l'accueil.
-  useEffect(() => {
-    if (!userId) return;
-
-    let handled = false;
-
-    const unsub = onSnapshot(currentUserDocRef, async (snapshot) => {
-      if (!snapshot.exists()) return;
-
-      const data = snapshot.data();
-
-      if (data?.forceLogoutAt && !handled) {
-        handled = true;
-
-        try {
-          await updateDoc(currentUserDocRef, {
-            forceLogoutAt: null,
-            isConnected: false,
-            isAdmin: false,
-          });
-        } catch (err) {
-          console.error("force logout cleanup error:", err);
-        }
-
-        localStorage.removeItem("username");
-        localStorage.removeItem("isSpotifyAdmin");
-        localStorage.removeItem("userId");
-        localStorage.removeItem("sharedQueueCache");
-
-        setIsAdminUnlocked(false);
-        setSpotifyUser(null);
-        setSpotifyToken(null);
-        setShowPinModal(false);
-        setShowUserMenu(false);
-        setShowSpotifyMenu(false);
-        setPinInput("");
-        setPinError("");
-
-        window.location.href = "/";
-      }
-    });
-
-    return () => unsub();
-  }, [currentUserDocRef, userId]);
-
-
-  
-  // =========================
-  // 📡 État partagé du lecteur
-  // =========================
-  // Les autres utilisateurs peuvent lire l'état courant du player via Firestore.
   useEffect(() => {
     const unsub = onSnapshot(playerStateDocRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -362,10 +175,6 @@ useEffect(() => {
     return () => unsub();
   }, [playerStateDocRef]);
 
-  // =========================
-  // ↕️ Tri de la file d'attente
-  // =========================
-  // Tri prioritaire par position, puis par date d'ajout.
   const sortedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
       const positionA =
@@ -471,6 +280,9 @@ useEffect(() => {
       clearTimeout(spotifyTimeoutRef.current);
       clearTimeout(toastTimeoutRef.current);
       clearTimeout(reconnectTimeoutRef.current);
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
       if (audioPreviewRef.current) {
         audioPreviewRef.current.pause();
       }
@@ -536,9 +348,6 @@ useEffect(() => {
     });
   }, [suggestions, suggestionsFilter]);
 
-  // =========================
-  // 🛠️ Fonctions utilitaires d'affichage
-  // =========================
   const formatTimeAgo = (timestamp) => {
     if (!timestamp) return "il y a un moment";
 
@@ -572,9 +381,6 @@ useEffect(() => {
     toastTimeoutRef.current = setTimeout(() => setToastMessage(""), 2500);
   };
 
-  // =========================
-  // 🔐 Actions utilisateur / admin
-  // =========================
   const handleLogin = () => {
     if (!usernameInput.trim()) return;
     const cleanName = usernameInput.trim();
@@ -606,9 +412,6 @@ useEffect(() => {
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // =========================
-  // 📦 Helpers de construction d'objet pour l'état partagé
-  // =========================
   const buildTrackPayload = (track) => {
     if (!track) return null;
 
@@ -652,9 +455,6 @@ useEffect(() => {
     };
   };
 
-  // =========================
-  // ☁️ Synchronisation du player vers Firestore
-  // =========================
   const syncSharedPlayerState = async (payload) => {
     try {
       await setDoc(
@@ -711,9 +511,6 @@ useEffect(() => {
     });
   };
 
-  // =========================
-  // 🕘 Historique et nettoyage des morceaux lus
-  // =========================
   const addTrackToHistory = async (trackInfo) => {
     if (!trackInfo?.id) return;
     if (historyLoggedTrackRef.current === trackInfo.id) return;
@@ -793,9 +590,6 @@ useEffect(() => {
     }, delay);
   };
 
-  // =========================
-  // 🎧 Initialisation du Spotify Web Playback SDK
-  // =========================
   useEffect(() => {
     if (!spotifyToken || !spotifyUser) return;
 
@@ -1083,9 +877,6 @@ useEffect(() => {
     };
   }, [spotifyPlayer, spotifyToken, spotifyUser]);
 
-  // =========================
-  // ✨ Suggestions automatiques
-  // =========================
   const refreshSuggestions = async () => {
     if (!dominantArtistQuery) {
       setSuggestions([]);
@@ -1191,22 +982,53 @@ useEffect(() => {
     isPaused,
   ]);
 
-  // =========================
-  // 🔎 Recherche Spotify via ton endpoint serveur
-  // =========================
   const searchSpotify = async (queryText) => {
-    if (!queryText || !queryText.trim()) {
+    const cleanQuery = (queryText || "").trim();
+
+    latestSearchRef.current = cleanQuery;
+
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+      searchAbortRef.current = null;
+    }
+
+    if (!cleanQuery) {
       setSearchResults([]);
       setSearchError("");
+      setIsSearching(false);
       return;
     }
+
+    if (cleanQuery.length < 2) {
+      setSearchResults([]);
+      setSearchError("");
+      setIsSearching(false);
+      return;
+    }
+
+    const cached = searchCacheRef.current.get(cleanQuery.toLowerCase());
+    if (cached) {
+      setSearchResults(cached);
+      setSearchError("");
+      setIsSearching(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
 
     try {
       setIsSearching(true);
       setSearchError("");
 
       const res = await fetch(
-        `/api/spotify-search?q=${encodeURIComponent(queryText)}`
+        `/api/spotify-search?q=${encodeURIComponent(cleanQuery)}`,
+        {
+          signal: controller.signal,
+          headers: {
+            Accept: "application/json",
+          },
+        }
       );
       const text = await res.text();
 
@@ -1214,16 +1036,58 @@ useEffect(() => {
         throw new Error(text || `HTTP ${res.status}`);
       }
 
-      const data = JSON.parse(text);
-      setSearchResults(Array.isArray(data) ? data : []);
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("Réponse Spotify invalide");
+      }
+
+      const results = Array.isArray(data) ? data : [];
+
+      if (latestSearchRef.current !== cleanQuery) {
+        return;
+      }
+
+      searchCacheRef.current.set(cleanQuery.toLowerCase(), results);
+      setSearchResults(results);
+      setSearchError("");
     } catch (err) {
+      if (err?.name === "AbortError") {
+        return;
+      }
+
       console.error("Spotify error:", err);
       setSearchResults([]);
       setSearchError("Impossible de charger les résultats Spotify");
     } finally {
-      setIsSearching(false);
+      if (latestSearchRef.current === cleanQuery) {
+        setIsSearching(false);
+      }
+
+      if (searchAbortRef.current === controller) {
+        searchAbortRef.current = null;
+      }
     }
   };
+
+  useEffect(() => {
+    const cleanQuery = (searchQuery || "").trim();
+
+    if (!cleanQuery) {
+      setSearchResults([]);
+      setSearchError("");
+      setIsSearching(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      searchSpotify(cleanQuery);
+    }, 450);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
 
   const getPlayableDeviceId = async () => {
     for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -1249,10 +1113,6 @@ useEffect(() => {
     return playerDeviceIdRef.current || playerDeviceId || null;
   };
 
-  // =========================
-  // ▶️ Contrôle de lecture Spotify
-  // =========================
-  // Cette fonction transfère la lecture vers le bon device puis lance le morceau.
   const playSpotifyTrack = async (spotifyId, isAuto = false) => {
     if (launchInFlightRef.current) {
       return false;
@@ -1536,9 +1396,6 @@ useEffect(() => {
     }
   };
 
-  // =========================
-  // ➕ Ajout de morceaux dans la file
-  // =========================
   const addSpotifyTrackToPlaylist = async (spotifyTrackData) => {
     if (!spotifyTrackData?.id) {
       setAddError("Sélectionne d’abord un morceau Spotify");
@@ -1734,9 +1591,6 @@ useEffect(() => {
     setTouchCurrentX((prev) => ({ ...prev, [id]: null }));
   };
 
-  // =========================
-  // 🔁 Réparation / réorganisation de la file
-  // =========================
   const relaunchSpotifyPlayer = async () => {
     if (!isAdminUnlocked || !spotifyUser) return;
 
@@ -1813,18 +1667,33 @@ useEffect(() => {
     }
   };
 
-  const moveTrackUp = async (trackId) => {
-    if (!isAdminUnlocked) return;
+  const reinjectHistoryTrack = async (item) => {
+    if (!item?.spotifyId) return;
+
+    const syntheticTrack = {
+      id: item.spotifyId,
+      name: item.title,
+      artists: [{ name: item.artist || "Artiste inconnu" }],
+      album: {
+        images: item.albumImage ? [{ url: item.albumImage }] : [],
+      },
+      preview_url: null,
+    };
+
+    await addSpotifyTrackToPlaylist(syntheticTrack);
+  };
+
+  const reorderTracks = async (sourceId, targetId) => {
+    if (!isAdminUnlocked || sourceId === targetId) return;
 
     const currentList = [...sortedTracks];
-    const sourceIndex = currentList.findIndex((track) => track.id === trackId);
+    const sourceIndex = currentList.findIndex((track) => track.id === sourceId);
+    const targetIndex = currentList.findIndex((track) => track.id === targetId);
 
-    if (sourceIndex <= 0) return;
+    if (sourceIndex === -1 || targetIndex === -1) return;
 
-    [currentList[sourceIndex - 1], currentList[sourceIndex]] = [
-      currentList[sourceIndex],
-      currentList[sourceIndex - 1],
-    ];
+    const [moved] = currentList.splice(sourceIndex, 1);
+    currentList.splice(targetIndex, 0, moved);
 
     const reordered = currentList.map((track, index) => ({
       ...track,
@@ -1844,40 +1713,17 @@ useEffect(() => {
         await refreshSharedQueueFromTracks(reordered);
       }
 
-      showToast("Musique remontée d’un cran");
+      showToast("Playlist réorganisée");
     } catch (err) {
-      console.error("moveTrackUp error:", err);
-      setPlayerError("Impossible de remonter cette musique");
+      console.error("reorderTracks error:", err);
+      setPlayerError("Impossible de réorganiser la playlist");
     }
   };
 
-  const reinjectHistoryTrack = async (item) => {
-    if (!item?.spotifyId) return;
-
-    const syntheticTrack = {
-      id: item.spotifyId,
-      name: item.title,
-      artists: [{ name: item.artist || "Artiste inconnu" }],
-      album: {
-        images: item.albumImage ? [{ url: item.albumImage }] : [],
-      },
-      preview_url: null,
-    };
-
-    await addSpotifyTrackToPlaylist(syntheticTrack);
-  };
-
-
-  // =========================
-  // 🖼️ Fonctions de rendu d'éléments UI
-  // =========================
   const renderHistoryItem = (item) => {
     const image = getTrackImage(item);
 
-    // =========================
-  // 🧩 Rendu principal de l'interface
-  // =========================
-  return (
+    return (
       <div key={item.id} style={styles.historyRow}>
         {image ? (
           <img src={image} alt={item.title} style={styles.historyThumb} />
@@ -1924,22 +1770,7 @@ useEffect(() => {
           }
           onTouchEnd={isAdminQueueItem ? () => handleTouchEnd(track.id) : undefined}
         >
-          <div style={styles.liveQueueOrderBox}>
-            {isAdminQueueItem && track.id && track.order > 1 ? (
-              <button
-                style={styles.upArrowButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moveTrackUp(track.id);
-                }}
-                title="Remonter d’un cran"
-              >
-                ⬆️
-              </button>
-            ) : (
-              <span style={styles.queueTopPlaceholder}>•</span>
-            )}
-          </div>
+          <div style={styles.liveQueueOrderBox}>{track.order}</div>
 
           <div style={styles.liveQueueMediaColumn}>
             {image ? (
@@ -2055,8 +1886,8 @@ useEffect(() => {
 
       <div style={styles.card}>
         <div style={styles.appHeader}>
-          <div style={styles.titleRow}>
-            <h1 style={styles.appTitle}>♪ Musique</h1>
+          <div>
+            <h1 style={styles.appTitle}>Partage Musique</h1>
           </div>
 
           <div style={styles.headerActions}>
@@ -2072,16 +1903,25 @@ useEffect(() => {
                   OK
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <div style={styles.userBadge}>👤 {username}</div>
+            )}
 
-            {username ? (
+            {!isAdminUnlocked ? (
               <button
-                style={styles.userMenuButton}
-                onClick={() => setShowUserMenu(true)}
+                style={styles.adminGhostButton}
+                onClick={() => {
+                  setShowPinModal(true);
+                  setPinError("");
+                }}
               >
-                👤 {username}
+                Admin Spotify
               </button>
-            ) : null}
+            ) : (
+              <button style={styles.adminGhostButton} onClick={lockAdminMode}>
+                Quitter admin
+              </button>
+            )}
           </div>
         </div>
 
@@ -2106,74 +1946,41 @@ useEffect(() => {
 
         {isAdminUnlocked && spotifyUser && (
           <div style={styles.adminConnectedBar}>
-            <button
-              style={styles.spotifyUserBadgeCompact}
-              onClick={() => setShowSpotifyMenu(true)}
-            >
+            <div style={styles.spotifyUserBadgeCompact}>
               <span style={styles.spotifyDot} />
               Spotify connecté : {spotifyUser.display_name || spotifyUser.id}
+            </div>
+
+            <button
+              style={styles.spotifyLogoutButton}
+              onClick={() => {
+                logoutSpotify();
+                setSpotifyToken(null);
+                setSpotifyUser(null);
+                setSpotifyPlayer(null);
+                setPlayerReady(false);
+                setPlayerDeviceId(null);
+                setCurrentPlayback(null);
+                setCurrentPlaybackPosition(0);
+                setCurrentPlaybackDuration(0);
+                clearTimeout(reconnectTimeoutRef.current);
+                reconnectAttemptsRef.current = 0;
+                setPlaybackQueue([]);
+                setCurrentQueueIndex(-1);
+                syncSharedPlayerState({
+                  isPaused: true,
+                  position: 0,
+                  duration: 0,
+                  track: null,
+                  queueIndex: -1,
+                  queueLength: 0,
+                  queueTitle: "",
+                  queue: [],
+                });
+              }}
+            >
+              Déconnecter Spotify
             </button>
-          </div>
-        )}
-        {isAdminUnlocked && (
-          <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
-            <div style={styles.sectionHeader}>
-              <div>
-                <h2 style={styles.sectionTitle}>Contrôles</h2>
-              </div>
-            </div>
-        
-            <div style={styles.playerControlsBlock}>
-              <div style={styles.playerControlsRow}>
-                <button
-                  style={styles.iconButtonPrimary}
-                  onClick={playPlaylist}
-                  disabled={!spotifyToken || !spotifyUser}
-                >
-                  ▶ Lire musique
-                </button>
-        
-                <button
-                  style={{
-                    ...styles.iconButton,
-                    ...(isPaused ? styles.iconButtonMuted : {}),
-                  }}
-                  onClick={pausePlayback}
-                  disabled={!spotifyPlayer || isPaused}
-                >
-                  ⏸
-                </button>
-        
-                <button
-                  style={{
-                    ...styles.iconButton,
-                    ...styles.iconButtonAccent,
-                    ...(!isPaused ? styles.iconButtonMuted : {}),
-                  }}
-                  onClick={resumePlayback}
-                  disabled={!spotifyPlayer || !isPaused}
-                >
-                  ▶
-                </button>
-        
-                <button
-                  style={styles.iconButton}
-                  onClick={playNextTrack}
-                  disabled={!spotifyToken || !spotifyUser}
-                >
-                  ⏭
-                </button>
-              </div>
-        
-              <button
-                style={styles.secondaryButton}
-                onClick={() => setAutoplayEnabled((prev) => !prev)}
-              >
-                {autoplayEnabled
-                  ? "Désactiver l’enchaînement automatique"
-                  : "Activer l’enchaînement automatique"}
-              </button>
-            </div>
           </div>
         )}
 
@@ -2234,7 +2041,13 @@ useEffect(() => {
                 />
               </div>
 
-              
+              {isAdminUnlocked ? (
+                <div style={styles.infoText}></div>
+              ) : (
+                <div style={styles.infoText}>
+                  Les commandes de lecture sont réservées à l’admin.
+                </div>
+              )}
 
               {displayedQueueLength > 0 && displayedQueueIndex >= 0 && (
                 <div style={styles.queueInfoInline}>
@@ -2257,6 +2070,73 @@ useEffect(() => {
             <button style={styles.relaunchButton} onClick={relaunchSpotifyPlayer}>
               Relancer Spotify
             </button>
+          )}
+        </div>
+
+        <div style={{ ...styles.sectionCard, marginBottom: 26 }}>
+          <div style={styles.sectionHeader}>
+            <div>
+              <div style={styles.sectionEyebrow}></div>
+              <h2 style={styles.sectionTitle}></h2>
+            </div>
+          </div>
+
+          {isAdminUnlocked ? (
+            <div style={styles.playerControlsBlock}>
+              <div style={styles.playerControlsRow}>
+                <button
+                  style={styles.iconButtonPrimary}
+                  onClick={playPlaylist}
+                  disabled={!spotifyToken || !spotifyUser}
+                >
+                  ▶ Lire musique
+                </button>
+
+                <button
+                  style={{
+                    ...styles.iconButton,
+                    ...(isPaused ? styles.iconButtonMuted : {}),
+                  }}
+                  onClick={pausePlayback}
+                  disabled={!spotifyPlayer || isPaused}
+                >
+                  ⏸
+                </button>
+
+                <button
+                  style={{
+                    ...styles.iconButton,
+                    ...styles.iconButtonAccent,
+                    ...(!isPaused ? styles.iconButtonMuted : {}),
+                  }}
+                  onClick={resumePlayback}
+                  disabled={!spotifyPlayer || !isPaused}
+                >
+                  ▶
+                </button>
+
+                <button
+                  style={styles.iconButton}
+                  onClick={playNextTrack}
+                  disabled={!spotifyToken || !spotifyUser}
+                >
+                  ⏭
+                </button>
+              </div>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => setAutoplayEnabled((prev) => !prev)}
+              >
+                {autoplayEnabled
+                  ? "Désactiver l’enchaînement automatique"
+                  : "Activer l’enchaînement automatique"}
+              </button>
+            </div>
+          ) : (
+            <div style={styles.infoText}>
+              Seul l’admin peut gérer le lecteur Spotify.
+            </div>
           )}
         </div>
 
@@ -2283,11 +2163,11 @@ useEffect(() => {
                 const value = e.target.value;
                 setSearchQuery(value);
                 setAddError("");
-
-                clearTimeout(spotifyTimeoutRef.current);
-                spotifyTimeoutRef.current = setTimeout(() => {
-                  searchSpotify(value);
-                }, 400);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  searchSpotify(searchQuery);
+                }
               }}
             />
 
@@ -2502,10 +2382,6 @@ useEffect(() => {
             )
           ) : null}
         </div>
-
-        <Link to="/" style={styles.homeReturnModule}>
-          <div style={styles.homeReturnButton}>⬅️ Retour à l’accueil</div>
-        </Link>
       </div>
 
       {toastMessage && <div style={styles.toast}>{toastMessage}</div>}
@@ -2551,108 +2427,6 @@ useEffect(() => {
         </div>
       )}
 
-      {showUserMenu && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <div style={styles.popupHeader}>
-              <div style={styles.modalTitle}>Compte</div>
-              <button
-                style={styles.popupCloseButton}
-                onClick={() => setShowUserMenu(false)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={styles.popupMenuList}>
-              <button
-                style={styles.popupMenuButton}
-                onClick={() => {
-                  localStorage.removeItem("username");
-                  setShowUserMenu(false);
-                  window.location.reload();
-                }}
-              >
-                Déconnecter l’utilisateur
-              </button>
-
-              {!isAdminUnlocked ? (
-                <button
-                  style={styles.popupMenuButton}
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    setShowPinModal(true);
-                    setPinError("");
-                  }}
-                >
-                  Passer admin
-                </button>
-              ) : (
-                <button
-                  style={styles.popupMenuButton}
-                  onClick={() => {
-                    lockAdminMode();
-                    setShowUserMenu(false);
-                  }}
-                >
-                  Quitter mode admin
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSpotifyMenu && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <div style={styles.popupHeader}>
-              <div style={styles.modalTitle}>Spotify</div>
-              <button
-                style={styles.popupCloseButton}
-                onClick={() => setShowSpotifyMenu(false)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={styles.popupMenuList}>
-              <button
-                style={styles.popupMenuButton}
-                onClick={() => {
-                  logoutSpotify();
-                  setSpotifyToken(null);
-                  setSpotifyUser(null);
-                  setSpotifyPlayer(null);
-                  setPlayerReady(false);
-                  setPlayerDeviceId(null);
-                  setCurrentPlayback(null);
-                  setCurrentPlaybackPosition(0);
-                  setCurrentPlaybackDuration(0);
-                  clearTimeout(reconnectTimeoutRef.current);
-                  reconnectAttemptsRef.current = 0;
-                  setPlaybackQueue([]);
-                  setCurrentQueueIndex(-1);
-                  setShowSpotifyMenu(false);
-                  syncSharedPlayerState({
-                    isPaused: true,
-                    position: 0,
-                    duration: 0,
-                    track: null,
-                    queueIndex: -1,
-                    queueLength: 0,
-                    queueTitle: "",
-                    queue: [],
-                  });
-                }}
-              >
-                Déconnecter Spotify
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {trackToDelete && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
@@ -2680,9 +2454,6 @@ useEffect(() => {
   );
 }
 
-// =========================
-// 🎨 Styles inline de l'application
-// =========================
 const styles = {
   page: {
     minHeight: "100vh",
@@ -2727,27 +2498,17 @@ const styles = {
   appHeader: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
     marginBottom: 18,
     flexWrap: "wrap",
-  },
-  titleRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    flexWrap: "nowrap",
-    minWidth: 0,
   },
   headerActions: {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    flexWrap: "nowrap",
+    flexWrap: "wrap",
     justifyContent: "flex-end",
-    marginLeft: "auto",
-    marginRight: 0,
-    width: "auto",
   },
   appTitle: {
     margin: 0,
@@ -2832,20 +2593,14 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
   },
-  userMenuButton: {
-    padding: "8px 12px",
-    borderRadius: 999,
-    border: "1px solid rgba(148,163,184,0.22)",
+  userBadge: {
+    fontSize: 13,
+    fontWeight: "bold",
     background: "rgba(15,23,42,0.82)",
     color: "#e2e8f0",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: 13,
-    marginLeft: "auto",
-    maxWidth: 180,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    border: "1px solid rgba(148,163,184,0.22)",
+    borderRadius: 999,
+    padding: "10px 14px",
   },
   inputCol: {
     display: "flex",
@@ -2885,9 +2640,6 @@ const styles = {
     alignItems: "center",
     gap: 10,
     border: "1px solid rgba(16,185,129,0.24)",
-    cursor: "pointer",
-    width: "100%",
-    justifyContent: "flex-start",
   },
   spotifyDot: {
     width: 10,
@@ -3415,34 +3167,17 @@ const styles = {
     border: "1px solid rgba(148,163,184,0.10)",
   },
   liveQueueOrderBox: {
-    minWidth: 36,
+    minWidth: 20,
     marginLeft: -2,
     marginRight: -2,
+    textAlign: "left",
+    fontWeight: "bold",
     userSelect: "none",
+    color: "#86efac",
     alignSelf: "stretch",
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  upArrowButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    border: "1px solid rgba(148,163,184,0.18)",
-    background: "rgba(15,23,42,0.9)",
-    color: "#f8fafc",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 14,
-    boxShadow: "0 6px 16px rgba(0,0,0,0.18)",
-  },
-  queueTopPlaceholder: {
-    fontSize: 20,
-    lineHeight: 1,
-    color: "rgba(134,239,172,0.4)",
+    justifyContent: "flex-start",
   },
   liveQueueMediaColumn: {
     display: "flex",
@@ -3553,84 +3288,5 @@ const styles = {
     fontWeight: "bold",
     boxShadow: "0 12px 30px rgba(0,0,0,0.24)",
     zIndex: 1200,
-  },
-  popupHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 12,
-  },
-  popupCloseButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    border: "1px solid rgba(148,163,184,0.18)",
-    background: "#111827",
-    color: "#f8fafc",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
-  popupMenuList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  popupMenuButton: {
-    width: "100%",
-    padding: "12px 14px",
-    borderRadius: 12,
-    border: "1px solid rgba(148,163,184,0.18)",
-    background: "rgba(15,23,42,0.82)",
-    color: "#f8fafc",
-    cursor: "pointer",
-    fontWeight: "bold",
-    textAlign: "left",
-  },
-  homeReturnModule: {
-    display: "flex",
-    justifyContent: "center",
-    textDecoration: "none",
-    marginTop: 18,
-    marginBottom: 24,
-    borderRadius: 24,
-    padding: 18,
-    background: "rgba(15,23,42,0.82)",
-    border: "1px solid rgba(148,163,184,0.16)",
-    boxShadow: "0 14px 40px rgba(0,0,0,0.24)",
-    color: "#f8fafc",
-  },
-  homeReturnBadge: {
-    display: "inline-flex",
-    padding: "6px 10px",
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#d1fae5",
-    background: "rgba(29,185,84,0.12)",
-    border: "1px solid rgba(29,185,84,0.18)",
-    marginBottom: 14,
-  },
-  homeReturnTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  homeReturnText: {
-    color: "#94a3b8",
-    fontSize: 14,
-    lineHeight: 1.6,
-    marginBottom: 18,
-  },
-  homeReturnButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "12px 18px",
-    borderRadius: 14,
-    background: "linear-gradient(135deg, #1DB954, #16a34a)",
-    color: "#ffffff",
-    fontWeight: "bold",
-    boxShadow: "0 10px 22px rgba(29,185,84,0.24)",
   },
 };
