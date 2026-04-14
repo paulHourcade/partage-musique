@@ -527,7 +527,7 @@ export default function AdminUsers() {
                 style={styles.userMenuButton}
                 onClick={() => setShowUserMenu(true)}
               >
-                👤 {username} {isAdminUnlocked ? "👑" : ""}
+                {isAdminUnlocked ? "👑" : "👤"} {username}
               </button>
             )}
           </div>
