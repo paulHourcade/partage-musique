@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { db } from "./firebase";
 import {
@@ -12,19 +12,23 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-// =========================
-// ⚙️ Configuration locale
-// =========================
-// Ce PIN permet d'activer les actions d'administration.
 const ADMIN_PIN = "1234";
 
 export default function AdminUsers() {
-  // =========================
-  // 👤 État utilisateur local
-  // =========================
-  // username : nom affiché dans l'application
-  // userId : identifiant local unique utilisé comme clé Firestore
+  const [users, setUsers] = useState([]);
   const [usernameInput, setUsernameInput] = useState("");
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
+
+  const [swipeX, setSwipeX] = useState({});
+  const [touchStartX, setTouchStartX] = useState({});
+  const [touchCurrentX, setTouchCurrentX] = useState({});
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
   const [username] = useState(() => localStorage.getItem("username") || "");
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
@@ -35,37 +39,10 @@ export default function AdminUsers() {
     return id;
   });
 
-  // =========================
-  // 👥 États d'interface
-  // =========================
-  const [users, setUsers] = useState([]);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pinInput, setPinInput] = useState("");
-  const [pinError, setPinError] = useState("");
-  const [toastMessage, setToastMessage] = useState("");
-  const [userToDelete, setUserToDelete] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
-
-  // =========================
-  // 🛡️ État admin local
-  // =========================
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
     return localStorage.getItem("isSpotifyAdmin") === "true";
   });
 
-  // =========================
-  // 👆 États de swipe mobile
-  // =========================
-  const [swipeX, setSwipeX] = useState({});
-  const [touchStartX, setTouchStartX] = useState({});
-  const [touchCurrentX, setTouchCurrentX] = useState({});
-
-  const toastTimeoutRef = useRef(null);
-
-  // =========================
-  // 🗂️ Références Firestore
-  // =========================
   const usersCollectionRef = useMemo(() => collection(db, "users"), []);
   const usersQueryRef = useMemo(
     () => query(usersCollectionRef, orderBy("lastSeen", "desc")),
@@ -73,9 +50,6 @@ export default function AdminUsers() {
   );
   const currentUserDocRef = useMemo(() => doc(db, "users", userId), [userId]);
 
-  // =========================
-  // 🔄 Liste temps réel des utilisateurs
-  // =========================
   useEffect(() => {
     const unsub = onSnapshot(
       usersQueryRef,
@@ -94,113 +68,16 @@ export default function AdminUsers() {
     return () => unsub();
   }, [usersQueryRef]);
 
-  // =========================
-  // 💓 Synchronisation du profil utilisateur
-  // =========================
-  // Quand l'utilisateur local a un username, on met à jour son document Firestore.
-  useEffect(() => {
-    if (!username || !userId) return;
-
-    const syncUser = async () => {
-      try {
-        await setDoc(
-          currentUserDocRef,
-          {
-            userId,
-            name: username,
-            isAdmin: isAdminUnlocked,
-            isConnected: true,
-            connectedAt: Date.now(),
-            lastSeen: Date.now(),
-            forceLogoutAt: null,
-          },
-          { merge: true }
-        );
-      } catch (err) {
-        console.error("user sync error:", err);
-      }
-    };
-
-    syncUser();
-  }, [username, userId, isAdminUnlocked, currentUserDocRef]);
-
-  // =========================
-  // ⏱️ Heartbeat utilisateur
-  // =========================
-  // Permet d'indiquer qu'un utilisateur est toujours actif.
-  useEffect(() => {
-    if (!username || !userId) return;
-
-    const interval = setInterval(async () => {
-      try {
-        await updateDoc(currentUserDocRef, {
-          lastSeen: Date.now(),
-          isConnected: true,
-          isAdmin: isAdminUnlocked,
-        });
-      } catch (err) {
-        console.error("lastSeen update error:", err);
-      }
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [username, userId, isAdminUnlocked, currentUserDocRef]);
-
-  // =========================
-  // 🚪 Marquage de déconnexion navigateur
-  // =========================
-  useEffect(() => {
-    if (!username || !userId) return;
-
-    const markDisconnected = async () => {
-      try {
-        await updateDoc(currentUserDocRef, {
-          isConnected: false,
-          lastSeen: Date.now(),
-        });
-      } catch (err) {
-        console.error("disconnect mark error:", err);
-      }
-    };
-
-    const handleBeforeUnload = () => {
-      markDisconnected();
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      markDisconnected();
-    };
-  }, [username, userId, currentUserDocRef]);
-
-  // =========================
-  // 🚫 Déconnexion forcée à distance
-  // =========================
-  // Si un admin déclenche forceLogoutAt, on nettoie la session locale.
   useEffect(() => {
     if (!userId) return;
 
-    const unsub = onSnapshot(currentUserDocRef, async (snapshot) => {
+    const unsub = onSnapshot(currentUserDocRef, (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
 
       if (data?.forceLogoutAt) {
-        try {
-          await updateDoc(currentUserDocRef, {
-            forceLogoutAt: null,
-            isConnected: false,
-            isAdmin: false,
-          });
-        } catch (err) {
-          console.error("force logout cleanup error:", err);
-        }
-
         localStorage.removeItem("username");
         localStorage.removeItem("isSpotifyAdmin");
-        localStorage.removeItem("sharedQueueCache");
-
         setShowUserMenu(false);
         setShowPinModal(false);
         setIsAdminUnlocked(false);
@@ -211,44 +88,11 @@ export default function AdminUsers() {
     return () => unsub();
   }, [currentUserDocRef, userId]);
 
-  useEffect(() => {
-    return () => clearTimeout(toastTimeoutRef.current);
-  }, []);
-
-  // =========================
-  // 🧰 Helpers UI
-  // =========================
   const showToast = (message) => {
-    clearTimeout(toastTimeoutRef.current);
     setToastMessage(message);
-    toastTimeoutRef.current = setTimeout(() => setToastMessage(""), 2500);
+    setTimeout(() => setToastMessage(""), 2500);
   };
 
-  const formatTimeAgo = (timestamp) => {
-    if (!timestamp) return "inconnu";
-
-    const diffMs = Date.now() - timestamp;
-    const diffSeconds = Math.max(Math.floor(diffMs / 1000), 0);
-    const diffMinutes = Math.floor(diffSeconds / 60);
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffSeconds < 10) return "à l’instant";
-    if (diffSeconds < 60) {
-      return `il y a ${diffSeconds} seconde${diffSeconds > 1 ? "s" : ""}`;
-    }
-    if (diffMinutes < 60) {
-      return `il y a ${diffMinutes} minute${diffMinutes > 1 ? "s" : ""}`;
-    }
-    if (diffHours < 24) {
-      return `il y a ${diffHours} heure${diffHours > 1 ? "s" : ""}`;
-    }
-    return `il y a ${diffDays} jour${diffDays > 1 ? "s" : ""}`;
-  };
-
-  // =========================
-  // 🔐 Actions compte local
-  // =========================
   const handleLogin = () => {
     if (!usernameInput.trim()) return;
     const cleanName = usernameInput.trim();
@@ -323,9 +167,6 @@ export default function AdminUsers() {
     window.location.reload();
   };
 
-  // =========================
-  // 👑 Actions admin à distance
-  // =========================
   const forceLogoutUser = async (targetUserId) => {
     try {
       await updateDoc(doc(db, "users", targetUserId), {
@@ -335,22 +176,6 @@ export default function AdminUsers() {
       showToast("Utilisateur déconnecté");
     } catch (err) {
       console.error("force logout error:", err);
-    }
-  };
-
-  const toggleAdminRights = async (targetUser) => {
-    try {
-      await updateDoc(doc(db, "users", targetUser.id), {
-        isAdmin: !targetUser.isAdmin,
-        lastSeen: Date.now(),
-      });
-      showToast(
-        !targetUser.isAdmin
-          ? "Droits admin accordés"
-          : "Droits admin retirés"
-      );
-    } catch (err) {
-      console.error("toggle admin error:", err);
     }
   };
 
@@ -372,9 +197,28 @@ export default function AdminUsers() {
     setUserToDelete(null);
   };
 
-  // =========================
-  // 👆 Swipe mobile pour suppression
-  // =========================
+  const formatTimeAgo = (timestamp) => {
+    if (!timestamp) return "inconnu";
+
+    const diffMs = Date.now() - timestamp;
+    const diffSeconds = Math.max(Math.floor(diffMs / 1000), 0);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSeconds < 10) return "à l’instant";
+    if (diffSeconds < 60) {
+      return `il y a ${diffSeconds} seconde${diffSeconds > 1 ? "s" : ""}`;
+    }
+    if (diffMinutes < 60) {
+      return `il y a ${diffMinutes} minute${diffMinutes > 1 ? "s" : ""}`;
+    }
+    if (diffHours < 24) {
+      return `il y a ${diffHours} heure${diffHours > 1 ? "s" : ""}`;
+    }
+    return `il y a ${diffDays} jour${diffDays > 1 ? "s" : ""}`;
+  };
+
   const handleTouchStart = (e, id) => {
     const x = e.touches[0].clientX;
     setTouchStartX((prev) => ({ ...prev, [id]: x }));
@@ -408,11 +252,9 @@ export default function AdminUsers() {
     setTouchCurrentX((prev) => ({ ...prev, [id]: null }));
   };
 
-  // =========================
-  // 🖼️ Rendu d'un utilisateur
-  // =========================
   const renderUserItem = (user) => {
     const isCurrentUser = user.id === userId;
+    const isUserOnline = Boolean(user.isConnected);
 
     return (
       <div key={user.id} style={styles.swipeWrapper}>
@@ -426,11 +268,8 @@ export default function AdminUsers() {
           onTouchMove={isAdminUnlocked ? (e) => handleTouchMove(e, user.id) : undefined}
           onTouchEnd={isAdminUnlocked ? () => handleTouchEnd(user.id) : undefined}
         >
-          <div style={styles.userAvatarWrap}>
-            <div style={styles.userAvatar}>
-              {(user.name || "?").charAt(0).toUpperCase()}
-            </div>
-            
+          <div style={styles.userAvatar}>
+            {(user.name || "?").charAt(0).toUpperCase()}
           </div>
 
           <div style={styles.userContent}>
@@ -438,31 +277,18 @@ export default function AdminUsers() {
               <div style={styles.userTopLine}>
                 <div style={styles.userName}>
                   {user.name || "Sans nom"} {isCurrentUser ? "(toi)" : ""}
-                  {user.isAdmin ? " 👑" : ""}
                 </div>
 
-                {isAdminUnlocked && !isCurrentUser ? (
-                  <div style={styles.inlineActions}>
-                    <button
-                      style={styles.adminToggleButton}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleAdminRights(user);
-                      }}
-                    >
-                      {user.isAdmin ? "Retirer admin" : "Donner admin"}
-                    </button>
-
-                    <button
-                      style={styles.disconnectButtonInline}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        forceLogoutUser(user.id);
-                      }}
-                    >
-                      Déconnecter
-                    </button>
-                  </div>
+                {isAdminUnlocked && isUserOnline ? (
+                  <button
+                    style={styles.disconnectButtonInline}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      forceLogoutUser(user.id);
+                    }}
+                  >
+                    Déconnecter
+                  </button>
                 ) : null}
               </div>
 
@@ -472,7 +298,7 @@ export default function AdminUsers() {
                   ...(user.isConnected ? styles.statusOnline : styles.statusOffline),
                 }}
               >
-                {user.isConnected && Date.now() - (user.lastSeen || 0) < 60000 ? "En ligne" : "Hors ligne"}
+                {user.isConnected ? "En ligne" : "Hors ligne"}
               </div>
             </div>
 
@@ -488,15 +314,6 @@ export default function AdminUsers() {
       </div>
     );
   };
-
-  // =========================
-  // 🧮 Stats simples dashboard
-  // =========================
-  const onlineUsersCount = users.filter((user) => {
-    const lastSeen = user?.lastSeen || 0;
-    return Boolean(user.isConnected) && Date.now() - lastSeen < 60000;
-  }).length;
-  const adminUsersCount = users.filter((user) => user.isAdmin).length;
 
   return (
     <div style={styles.page}>
@@ -530,21 +347,6 @@ export default function AdminUsers() {
                 {isAdminUnlocked ? "👑" : "👤"} {username}
               </button>
             )}
-          </div>
-        </div>
-
-        <div style={styles.dashboardGrid}>
-          <div style={styles.statCard}>
-            <div style={styles.statValue}>{users.length}</div>
-            <div style={styles.statLabel}>Utilisateurs</div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={styles.statValue}>{onlineUsersCount}</div>
-            <div style={styles.statLabel}>En ligne</div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={styles.statValue}>{adminUsersCount}</div>
-            <div style={styles.statLabel}>Admins</div>
           </div>
         </div>
 
@@ -719,7 +521,7 @@ const styles = {
   },
   card: {
     width: "100%",
-    maxWidth: 700,
+    maxWidth: 520,
     position: "relative",
     zIndex: 1,
   },
@@ -752,30 +554,6 @@ const styles = {
     fontSize: 30,
     lineHeight: 1.05,
     color: "#f8fafc",
-  },
-  dashboardGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 12,
-    marginBottom: 16,
-  },
-  statCard: {
-    background: "rgba(15, 23, 42, 0.82)",
-    border: "1px solid rgba(148, 163, 184, 0.18)",
-    borderRadius: 20,
-    padding: 16,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.24)",
-    textAlign: "center",
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#f8fafc",
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#94a3b8",
-    marginTop: 6,
   },
   sectionCard: {
     background: "rgba(15, 23, 42, 0.82)",
@@ -858,27 +636,6 @@ const styles = {
     border: "1px solid rgba(148,163,184,0.10)",
     boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
   },
-  userAvatarWrap: {
-    position: "relative",
-    width: 52,
-    height: 52,
-    flexShrink: 0,
-  },
-  adminCrown: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    width: 24,
-    height: 24,
-    borderRadius: 999,
-    background: "rgba(234,179,8,0.18)",
-    border: "1px solid rgba(234,179,8,0.35)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 13,
-    boxShadow: "0 6px 16px rgba(0,0,0,0.24)",
-  },
   userAvatar: {
     width: 52,
     height: 52,
@@ -937,22 +694,6 @@ const styles = {
     background: "rgba(148,163,184,0.12)",
     color: "#cbd5e1",
     border: "1px solid rgba(148,163,184,0.22)",
-  },
-  inlineActions: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  adminToggleButton: {
-    padding: "8px 10px",
-    borderRadius: 10,
-    border: "none",
-    background: "rgba(59,130,246,0.16)",
-    color: "#dbeafe",
-    cursor: "pointer",
-    fontWeight: "bold",
-    flexShrink: 0,
-    fontSize: 12,
   },
   disconnectButtonInline: {
     padding: "8px 10px",
