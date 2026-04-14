@@ -2451,28 +2451,8 @@ export default function MusicApp() {
           </div>
         </div>
       )}
-
-      <button
-        onClick={() => navigate("/")}
-        style={{
-          position: "fixed",
-          bottom: "20px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          padding: "12px 20px",
-          borderRadius: "999px",
-          border: "none",
-          background: "#1DB954",
-          color: "white",
-          fontWeight: "bold",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
-          cursor: "pointer",
-          zIndex: 999,
-        }}
-      >
-        ← Retour à l’accueil
-      </button>
-      
+      <div style={styles.bottomReturnWrap}>
+</div>
     </div>
   );
 }
@@ -2481,7 +2461,9 @@ const styles = {
   page: {
     minHeight: "100vh",
     display: "flex",
-    justifyContent: "center",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "flex-start",
     background:
       "radial-gradient(circle at top, rgba(29,185,84,0.16), transparent 24%), linear-gradient(180deg, #07110a 0%, #0b1220 40%, #06080d 100%)",
     padding: 18,
@@ -2489,6 +2471,7 @@ const styles = {
     position: "relative",
     overflow: "hidden",
     color: "#f8fafc",
+    boxSizing: "border-box",
   },
   backgroundGlowTop: {
     position: "fixed",
@@ -3311,5 +3294,24 @@ const styles = {
     fontWeight: "bold",
     boxShadow: "0 12px 30px rgba(0,0,0,0.24)",
     zIndex: 1200,
+  },,
+
+  bottomReturnWrap: {
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    padding: "8px 0 28px",
+    marginTop: 10,
   },
+  bottomReturnButton: {
+    padding: "12px 20px",
+    borderRadius: "999px",
+    border: "none",
+    background: "#1DB954",
+    color: "white",
+    fontWeight: "bold",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+    cursor: "pointer",
+  },
+
 };
