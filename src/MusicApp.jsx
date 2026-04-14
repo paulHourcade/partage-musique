@@ -2079,7 +2079,7 @@ useEffect(() => {
                 style={styles.userMenuButton}
                 onClick={() => setShowUserMenu(true)}
               >
-                👤 {username}
+                {isAdminUnlocked ? "👑" : "👤"} {username}
               </button>
             ) : null}
           </div>
@@ -2521,6 +2521,8 @@ useEffect(() => {
             <input
               style={styles.input}
               type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={pinInput}
               onChange={(e) => {
                 setPinInput(e.target.value);
