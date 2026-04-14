@@ -426,8 +426,11 @@ export default function AdminUsers() {
           onTouchMove={isAdminUnlocked ? (e) => handleTouchMove(e, user.id) : undefined}
           onTouchEnd={isAdminUnlocked ? () => handleTouchEnd(user.id) : undefined}
         >
-          <div style={styles.userAvatar}>
-            {(user.name || "?").charAt(0).toUpperCase()}
+          <div style={styles.userAvatarWrap}>
+            <div style={styles.userAvatar}>
+              {(user.name || "?").charAt(0).toUpperCase()}
+            </div>
+            {user.isAdmin ? <div style={styles.adminCrown}>👑</div> : null}
           </div>
 
           <div style={styles.userContent}>
@@ -469,7 +472,7 @@ export default function AdminUsers() {
                   ...(user.isConnected ? styles.statusOnline : styles.statusOffline),
                 }}
               >
-                {user.isConnected ? "En ligne" : "Hors ligne"}
+                {user.isConnected && Date.now() - (user.lastSeen || 0) < 60000 ? "En ligne" : "Hors ligne"}
               </div>
             </div>
 
@@ -489,7 +492,10 @@ export default function AdminUsers() {
   // =========================
   // 🧮 Stats simples dashboard
   // =========================
-  const onlineUsersCount = users.filter((user) => user.isConnected).length;
+  const onlineUsersCount = users.filter((user) => {
+    const lastSeen = user?.lastSeen || 0;
+    return Boolean(user.isConnected) && Date.now() - lastSeen < 60000;
+  }).length;
   const adminUsersCount = users.filter((user) => user.isAdmin).length;
 
   return (
@@ -530,7 +536,7 @@ export default function AdminUsers() {
         <div style={styles.dashboardGrid}>
           <div style={styles.statCard}>
             <div style={styles.statValue}>{users.length}</div>
-            <div style={styles.statLabel}>Utilisateurs totaux</div>
+            <div style={styles.statLabel}>Utilisateurs</div>
           </div>
           <div style={styles.statCard}>
             <div style={styles.statValue}>{onlineUsersCount}</div>
@@ -617,6 +623,8 @@ export default function AdminUsers() {
             <input
               style={styles.input}
               type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={pinInput}
               onChange={(e) => {
                 setPinInput(e.target.value);
@@ -849,6 +857,27 @@ const styles = {
     borderRadius: 16,
     border: "1px solid rgba(148,163,184,0.10)",
     boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+  },
+  userAvatarWrap: {
+    position: "relative",
+    width: 52,
+    height: 52,
+    flexShrink: 0,
+  },
+  adminCrown: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    background: "rgba(234,179,8,0.18)",
+    border: "1px solid rgba(234,179,8,0.35)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 13,
+    boxShadow: "0 6px 16px rgba(0,0,0,0.24)",
   },
   userAvatar: {
     width: 52,
