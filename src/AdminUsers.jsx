@@ -29,7 +29,7 @@ export default function AdminUsers() {
   const [userToDelete, setUserToDelete] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
-  const [username] = useState(() => localStorage.getItem("username") || "");
+  const [username] = useState(() => localStorage.getItem("username") || "");²
   const [userId] = useState(() => {
     let id = localStorage.getItem("userId");
     if (!id) {
