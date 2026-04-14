@@ -3294,7 +3294,7 @@ const styles = {
     fontWeight: "bold",
     boxShadow: "0 12px 30px rgba(0,0,0,0.24)",
     zIndex: 1200,
-  },,
+  },
 
   bottomReturnWrap: {
     width: "100%",
