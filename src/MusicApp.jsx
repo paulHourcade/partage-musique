@@ -120,7 +120,7 @@ export default function MusicApp() {
   // 👤 Identité utilisateur locale
   // =========================
   // username : nom d'affichage visible dans l'app
-  // userId : identifiant local unique servant aussi de clé Firestore pour l'utilisateur.
+  // userId : identifiant local unique conservé entre les reconnexions pour retrouver le même document Firestore.
   const [usernameInput, setUsernameInput] = useState("");
   const [username] = useState(() => localStorage.getItem("username") || "");
   const [userId] = useState(() => {
@@ -325,7 +325,7 @@ useEffect(() => {
 
         localStorage.removeItem("username");
         localStorage.removeItem("isSpotifyAdmin");
-        localStorage.removeItem("userId");
+        // On conserve le même userId pour éviter de recréer un nouvel utilisateur au prochain login.
         localStorage.removeItem("sharedQueueCache");
 
         setIsAdminUnlocked(false);
@@ -577,7 +577,15 @@ useEffect(() => {
   // =========================
   const handleLogin = () => {
     if (!usernameInput.trim()) return;
+
     const cleanName = usernameInput.trim();
+    let existingUserId = localStorage.getItem("userId");
+
+    if (!existingUserId) {
+      existingUserId = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem("userId", existingUserId);
+    }
+
     localStorage.setItem("username", cleanName);
     window.location.reload();
   };
