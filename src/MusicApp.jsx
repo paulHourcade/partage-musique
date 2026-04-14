@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "./firebase";
+import { useNavigate } from "react-router-dom";
 import {
   fetchSpotifyProfile,
   getSpotifyAccessToken,
@@ -33,7 +34,7 @@ export default function MusicApp() {
       return [];
     }
   });
-
+  const navigate = useNavigate();
   const [historyTracks, setHistoryTracks] = useState([]);
   const [sharedPlayerState, setSharedPlayerState] = useState(null);
 
@@ -2450,6 +2451,28 @@ export default function MusicApp() {
           </div>
         </div>
       )}
+
+      <button
+        onClick={() => navigate("/")}
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          padding: "12px 20px",
+          borderRadius: "999px",
+          border: "none",
+          background: "#1DB954",
+          color: "white",
+          fontWeight: "bold",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+          cursor: "pointer",
+          zIndex: 999,
+        }}
+      >
+        ← Retour à l’accueil
+      </button>
+      
     </div>
   );
 }
