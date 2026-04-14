@@ -430,7 +430,7 @@ export default function AdminUsers() {
             <div style={styles.userAvatar}>
               {(user.name || "?").charAt(0).toUpperCase()}
             </div>
-            {user.isAdmin ? <div style={styles.adminCrown}>👑</div> : null}
+            
           </div>
 
           <div style={styles.userContent}>
@@ -527,7 +527,7 @@ export default function AdminUsers() {
                 style={styles.userMenuButton}
                 onClick={() => setShowUserMenu(true)}
               >
-                👤 {username}
+                👤 {username} {isAdminUnlocked ? "👑" : ""}
               </button>
             )}
           </div>
