@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { db } from "./firebase";
 import { 
-  addDoc,
+  addDoc, 
   collection,
   doc,
   getDocs,
