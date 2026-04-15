@@ -1,35 +1,51 @@
 import { Link } from "react-router-dom";
 
 export default function Home() {
+  const currentRoomCode = localStorage.getItem("currentRoomCode") || "";
+
+  const musicLink = currentRoomCode
+    ? `/app?room=${encodeURIComponent(currentRoomCode)}`
+    : "/app";
+
+  const adminLink = currentRoomCode
+    ? `/admin-users?room=${encodeURIComponent(currentRoomCode)}`
+    : "/admin-users";
+
   return (
     <div style={styles.page}>
       <div style={styles.glowTop} />
       <div style={styles.glowBottom} />
 
       <div style={styles.shell}>
+        {currentRoomCode ? (
+          <div style={styles.activeRoomCard}>
+            <div style={styles.activeRoomLabel}>Room active</div>
+            <div style={styles.activeRoomCode}>{currentRoomCode}</div>
+          </div>
+        ) : null}
+
         <div style={styles.stack}>
-          
-          {/* 🎵 ACCÈS MUSIQUE */}
-          <Link to="/app" style={{ ...styles.moduleCard, ...styles.musicAccessCard }}>
+          <Link to={musicLink} style={{ ...styles.moduleCard, ...styles.musicAccessCard }}>
             <div style={styles.moduleEmoji}>🎵</div>
             <div style={styles.moduleTitle}>Accéder à l’appli musique</div>
-            <div style={styles.moduleAction}>Ouvrir maintenant</div>
+            <div style={styles.moduleAction}>
+              {currentRoomCode ? "Rejoindre la room active" : "Ouvrir maintenant"}
+            </div>
           </Link>
 
-          {/* 🏠 CRÉATION ROOM */}
-          <Link to="/create-room" style={{ ...styles.moduleCard, ...styles.musicAccessCard }}>
+          <Link to="/create-room" style={{ ...styles.moduleCard, ...styles.roomCard }}>
             <div style={styles.moduleEmoji}>🏠</div>
             <div style={styles.moduleTitle}>Créer une room</div>
             <div style={styles.moduleAction}>Lancer une soirée</div>
           </Link>
 
-          {/* ⚙️ ADMIN */}
-          <Link to="/admin-users" style={styles.moduleCard}>
+          <Link to={adminLink} style={styles.moduleCard}>
             <div style={styles.moduleEmoji}>⚙️</div>
             <div style={styles.moduleTitle}>Administration</div>
-            <div style={styles.moduleAction}>Accéder</div>
+            <div style={styles.moduleAction}>
+              {currentRoomCode ? "Gérer la room active" : "Accéder"}
+            </div>
           </Link>
-
         </div>
 
         <div style={styles.appsSection}>
@@ -97,6 +113,28 @@ const styles = {
     position: "relative",
     zIndex: 1,
   },
+  activeRoomCard: {
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 18,
+    background: "rgba(15,23,42,0.82)",
+    border: "1px solid rgba(59,130,246,0.22)",
+    boxShadow: "0 14px 40px rgba(0,0,0,0.24)",
+  },
+  activeRoomLabel: {
+    fontSize: 13,
+    color: "#93c5fd",
+    fontWeight: "bold",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  activeRoomCode: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#f8fafc",
+    letterSpacing: 1.5,
+  },
   stack: {
     display: "flex",
     flexDirection: "column",
@@ -121,6 +159,12 @@ const styles = {
       "linear-gradient(135deg, rgba(29,185,84,0.18), rgba(15,23,42,0.94), rgba(15,23,42,0.92))",
     border: "1px solid rgba(29,185,84,0.28)",
     boxShadow: "0 18px 50px rgba(29,185,84,0.14)",
+  },
+  roomCard: {
+    background:
+      "linear-gradient(135deg, rgba(59,130,246,0.18), rgba(15,23,42,0.94), rgba(15,23,42,0.92))",
+    border: "1px solid rgba(59,130,246,0.28)",
+    boxShadow: "0 18px 50px rgba(59,130,246,0.14)",
   },
   moduleEmoji: {
     fontSize: 38,
