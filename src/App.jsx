@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-import MusicApp from "./MusicApp_rooms.jsx";
+import MusicApp from "./MusicApp.jsx";
 import Home from "./Home.jsx";
 import App1 from "./App1.jsx";
 import App2 from "./App2.jsx";
