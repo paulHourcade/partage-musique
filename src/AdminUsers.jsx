@@ -587,11 +587,8 @@ export default function AdminUsers() {
         </div>
 
         <div style={styles.homeReturnModule}>
-          <Link to={roomCode ? `/create-room?room=${roomCode}` : "/create-room"} style={styles.homeReturnButton}>
-            🏠 Room
-          </Link>
           <Link to={roomCode ? `/app?room=${roomCode}` : "/app"} style={styles.homeReturnButton}>
-            🎵 Retour musique
+            🎵 Retour à la musique
           </Link>
           <Link to="/" style={styles.homeReturnButton}>
             ⬅️ Accueil
