@@ -251,7 +251,6 @@ useEffect(() => {
         {
           userId,
           name: username,
-          isAdmin: isAdminUnlocked,
           connectedAt: Date.now(),
           lastSeen: Date.now(),
           isConnected: true,
@@ -265,7 +264,7 @@ useEffect(() => {
   };
 
   syncUser();
-}, [username, userId, isAdminUnlocked, currentUserDocRef]);
+}, [username, userId, currentUserDocRef]);
 
   // =========================
   // 💓 Heartbeat utilisateur
@@ -279,7 +278,6 @@ useEffect(() => {
       await updateDoc(currentUserDocRef, {
         lastSeen: Date.now(),
         isConnected: true,
-        isAdmin: isAdminUnlocked,
       });
     } catch (err) {
       console.error("lastSeen update error:", err);
@@ -287,7 +285,7 @@ useEffect(() => {
   }, 60000);
 
   return () => clearInterval(interval);
-}, [username, userId, isAdminUnlocked, currentUserDocRef]);
+}, [username, userId, currentUserDocRef]);
 
 
 // =========================
@@ -337,6 +335,14 @@ useEffect(() => {
 
       const data = snapshot.data();
 
+      if (data?.isAdmin === true) {
+        localStorage.setItem("isSpotifyAdmin", "true");
+        setIsAdminUnlocked(true);
+      } else {
+        localStorage.removeItem("isSpotifyAdmin");
+        setIsAdminUnlocked(false);
+      }
+
       if (data?.forceLogoutAt && !handled) {
         handled = true;
 
@@ -369,7 +375,7 @@ useEffect(() => {
     });
 
     return () => unsub();
-  }, [currentUserDocRef, userId]);
+  }, [currentUserDocRef, userId, queueCacheKey]);
 
 
   
