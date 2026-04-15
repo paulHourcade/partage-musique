@@ -365,6 +365,18 @@ export default function AdminUsers() {
     }
   };
 
+  const kickUserFromRoom = async (targetUserId) => {
+  try {
+    await updateDoc(doc(db, "rooms", roomCode, "members", targetUserId), {
+      removedFromRoomAt: Date.now(),
+      isConnected: false,
+    });
+    showToast("Utilisateur éjecté de la room");
+  } catch (err) {
+    console.error("kick user error:", err);
+  }
+};
+
   const toggleAdminRights = async (targetUser) => {
     try {
       await updateDoc(doc(db, "rooms", roomCode, "members", targetUser.id), {
@@ -483,10 +495,10 @@ export default function AdminUsers() {
                       style={styles.disconnectButtonInline}
                       onClick={(e) => {
                         e.stopPropagation();
-                        forceLogoutUser(user.id);
+                        kickUserFromRoom(user.id);
                       }}
                     >
-                      Déconnecter
+                      Ejecter de la Room
                     </button>
                   </div>
                 ) : null}
