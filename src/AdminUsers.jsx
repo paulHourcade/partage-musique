@@ -591,7 +591,7 @@ export default function AdminUsers() {
             🏠 Room
           </Link>
           <Link to={roomCode ? `/app?room=${roomCode}` : "/app"} style={styles.homeReturnButton}>
-            🎵 Retour à la musique
+            🎵 Retour musique
           </Link>
           <Link to="/" style={styles.homeReturnButton}>
             ⬅️ Accueil
