@@ -45,7 +45,11 @@ export default function MusicApp() {
   // puis Firestore reprend la main via les listeners temps réel.
   const [tracks, setTracks] = useState(() => {
     try {
-      const cached = localStorage.getItem("sharedQueueCache");
+      const initialRoomCode =
+        new URLSearchParams(window.location.search).get("room") ||
+        localStorage.getItem("currentRoomCode") ||
+        "default-room";
+      const cached = localStorage.getItem(`sharedQueueCache:${initialRoomCode}`);
       return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
@@ -162,19 +166,6 @@ export default function MusicApp() {
   const playerReadyRef = useRef(false);
   const tracksRef = useRef([]);
 
-  // =========================
-  // 🗂️ Références Firestore mémorisées
-  // =========================
-  // useMemo évite de recréer les références à chaque rendu.
-  const tracksCollectionRef = useMemo(() => collection(db, "rooms", roomCode, "tracks"), []);
-  const currentUserDocRef = useMemo(() => doc(db, "users", userId), [userId]);
-  const historyCollectionRef = useMemo(() => collection(db, "rooms", roomCode, "playHistory"), []);
-  const playerStateDocRef = useMemo(() => doc(db, "rooms", roomCode, "appState", "playerState"), []);
-  const historyQueryRef = useMemo(
-    () => query(historyCollectionRef, orderBy("playedAt", "desc"), limit(30)),
-    [historyCollectionRef]
-  );
-  
   const [searchParams] = useSearchParams();
   const roomCode = useMemo(() => {
     return (
@@ -183,6 +174,32 @@ export default function MusicApp() {
       "default-room"
     );
   }, [searchParams]);
+  const queueCacheKey = useMemo(() => `sharedQueueCache:${roomCode}`, [roomCode]);
+
+  // =========================
+  // 🗂️ Références Firestore mémorisées
+  // =========================
+  // useMemo évite de recréer les références à chaque rendu.
+  const tracksCollectionRef = useMemo(
+    () => collection(db, "rooms", roomCode, "tracks"),
+    [roomCode]
+  );
+  const currentUserDocRef = useMemo(
+    () => doc(db, "rooms", roomCode, "members", userId),
+    [roomCode, userId]
+  );
+  const historyCollectionRef = useMemo(
+    () => collection(db, "rooms", roomCode, "playHistory"),
+    [roomCode]
+  );
+  const playerStateDocRef = useMemo(
+    () => doc(db, "rooms", roomCode, "appState", "playerState"),
+    [roomCode]
+  );
+  const historyQueryRef = useMemo(
+    () => query(historyCollectionRef, orderBy("playedAt", "desc"), limit(30)),
+    [historyCollectionRef]
+  );
 
   // =========================
   // 🔄 Synchronisation temps réel de la playlist
@@ -336,7 +353,7 @@ useEffect(() => {
         localStorage.removeItem("username");
         localStorage.removeItem("isSpotifyAdmin");
         // On conserve le même userId pour éviter de recréer un nouvel utilisateur au prochain login.
-        localStorage.removeItem("sharedQueueCache");
+        localStorage.removeItem(queueCacheKey);
 
         setIsAdminUnlocked(false);
         setSpotifyUser(null);
@@ -390,7 +407,7 @@ useEffect(() => {
 
   useEffect(() => {
     try {
-      localStorage.setItem("sharedQueueCache", JSON.stringify(tracks));
+      localStorage.setItem(queueCacheKey, JSON.stringify(tracks));
     } catch {
       // ignore
     }
@@ -767,7 +784,7 @@ useEffect(() => {
     if (!track.id) return false;
 
     try {
-      await deleteDoc(doc(db, "tracks", track.id));
+      await deleteDoc(doc(tracksCollectionRef, track.id));
 
       const filteredTracks = tracksRef.current.filter((item) => item.id !== track.id);
       tracksRef.current = filteredTracks;
@@ -775,7 +792,7 @@ useEffect(() => {
       setPlaybackQueue((prev) => prev.filter((item) => item.id !== track.id));
 
       try {
-        localStorage.setItem("sharedQueueCache", JSON.stringify(filteredTracks));
+        localStorage.setItem(queueCacheKey, JSON.stringify(filteredTracks));
       } catch {
         // ignore
       }
@@ -1704,7 +1721,7 @@ useEffect(() => {
   };
 
   const removeTrack = async (id) => {
-    await deleteDoc(doc(db, "tracks", id));
+    await deleteDoc(doc(tracksCollectionRef, id));
   };
 
   const confirmDelete = async () => {
@@ -1816,7 +1833,7 @@ useEffect(() => {
     try {
       const batch = writeBatch(db);
       reordered.forEach((track) => {
-        batch.update(doc(db, "tracks", track.id), { position: track.position });
+        batch.update(doc(tracksCollectionRef, track.id), { position: track.position });
       });
       await batch.commit();
 
@@ -1854,7 +1871,7 @@ useEffect(() => {
     try {
       const batch = writeBatch(db);
       reordered.forEach((track) => {
-        batch.update(doc(db, "tracks", track.id), { position: track.position });
+        batch.update(doc(tracksCollectionRef, track.id), { position: track.position });
       });
       await batch.commit();
 
