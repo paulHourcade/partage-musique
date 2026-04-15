@@ -123,7 +123,6 @@ export default function AdminUsers() {
           {
             userId,
             name: username,
-            isAdmin: isAdminUnlocked,
             isConnected: true,
             connectedAt: Date.now(),
             lastSeen: Date.now(),
@@ -138,7 +137,7 @@ export default function AdminUsers() {
     };
 
     syncUser();
-  }, [username, userId, isAdminUnlocked, currentUserDocRef, roomCode]);
+  }, [username, userId, currentUserDocRef, roomCode]);
 
   // =========================
   // ⏱️ Heartbeat utilisateur
@@ -151,7 +150,6 @@ export default function AdminUsers() {
         await updateDoc(currentUserDocRef, {
           lastSeen: Date.now(),
           isConnected: true,
-          isAdmin: isAdminUnlocked,
         });
       } catch (err) {
         console.error("lastSeen update error:", err);
@@ -159,7 +157,7 @@ export default function AdminUsers() {
     }, 60000);
 
     return () => clearInterval(interval);
-  }, [username, userId, isAdminUnlocked, currentUserDocRef]);
+  }, [username, userId, currentUserDocRef]);
 
   // =========================
   // 🚪 Marquage de déconnexion navigateur
@@ -201,6 +199,14 @@ export default function AdminUsers() {
     const unsub = onSnapshot(currentUserDocRef, async (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
+
+      if (data?.isAdmin === true) {
+        localStorage.setItem("isSpotifyAdmin", "true");
+        setIsAdminUnlocked(true);
+      } else {
+        localStorage.removeItem("isSpotifyAdmin");
+        setIsAdminUnlocked(false);
+      }
 
       if (data?.forceLogoutAt && !handled) {
         handled = true;
