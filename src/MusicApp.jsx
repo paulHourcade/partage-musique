@@ -169,7 +169,7 @@ export default function MusicApp() {
   const tracksCollectionRef = useMemo(() => collection(db, "rooms", roomCode, "tracks"), []);
   const currentUserDocRef = useMemo(() => doc(db, "users", userId), [userId]);
   const historyCollectionRef = useMemo(() => collection(db, "rooms", roomCode, "playHistory"), []);
-  const playerStateDocRef = useMemo(() => doc(db, "appState", "playerState"), []);
+  const playerStateDocRef = useMemo(() => doc(db, "rooms", roomCode, "appState", "playerState"), []);
   const historyQueryRef = useMemo(
     () => query(historyCollectionRef, orderBy("playedAt", "desc"), limit(30)),
     [historyCollectionRef]
