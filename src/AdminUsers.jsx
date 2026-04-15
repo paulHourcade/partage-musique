@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { db } from "./firebase";
 import {
   collection,
@@ -19,11 +19,21 @@ import {
 const ADMIN_PIN = "1234";
 
 export default function AdminUsers() {
+  const [searchParams] = useSearchParams();
+
+  const roomCode = useMemo(() => {
+    return (
+      searchParams.get("room") ||
+      localStorage.getItem("currentRoomCode") ||
+      "default-room"
+    );
+  }, [searchParams]);
+
+  const roomCacheKey = useMemo(() => `sharedQueueCache:${roomCode}`, [roomCode]);
+
   // =========================
   // 👤 État utilisateur local
   // =========================
-  // username : nom affiché dans l'application
-  // userId : identifiant local unique utilisé comme clé Firestore
   const [usernameInput, setUsernameInput] = useState("");
   const [username] = useState(() => localStorage.getItem("username") || "");
   const [userId] = useState(() => {
@@ -66,15 +76,21 @@ export default function AdminUsers() {
   // =========================
   // 🗂️ Références Firestore
   // =========================
-  const usersCollectionRef = useMemo(() => collection(db, "users"), []);
-  const usersQueryRef = useMemo(
-    () => query(usersCollectionRef, orderBy("lastSeen", "desc")),
-    [usersCollectionRef]
+  const membersCollectionRef = useMemo(
+    () => collection(db, "rooms", roomCode, "members"),
+    [roomCode]
   );
-  const currentUserDocRef = useMemo(() => doc(db, "users", userId), [userId]);
+  const usersQueryRef = useMemo(
+    () => query(membersCollectionRef, orderBy("lastSeen", "desc")),
+    [membersCollectionRef]
+  );
+  const currentUserDocRef = useMemo(
+    () => doc(db, "rooms", roomCode, "members", userId),
+    [roomCode, userId]
+  );
 
   // =========================
-  // 🔄 Liste temps réel des utilisateurs
+  // 🔄 Liste temps réel des utilisateurs de la room active
   // =========================
   useEffect(() => {
     const unsub = onSnapshot(
@@ -87,7 +103,7 @@ export default function AdminUsers() {
         setUsers(freshUsers);
       },
       (error) => {
-        console.error("users onSnapshot error:", error);
+        console.error("members onSnapshot error:", error);
       }
     );
 
@@ -95,9 +111,8 @@ export default function AdminUsers() {
   }, [usersQueryRef]);
 
   // =========================
-  // 💓 Synchronisation du profil utilisateur
+  // 💓 Synchronisation du profil utilisateur dans la room active
   // =========================
-  // Quand l'utilisateur local a un username, on met à jour son document Firestore.
   useEffect(() => {
     if (!username || !userId) return;
 
@@ -113,6 +128,7 @@ export default function AdminUsers() {
             connectedAt: Date.now(),
             lastSeen: Date.now(),
             forceLogoutAt: null,
+            roomCode,
           },
           { merge: true }
         );
@@ -122,12 +138,11 @@ export default function AdminUsers() {
     };
 
     syncUser();
-  }, [username, userId, isAdminUnlocked, currentUserDocRef]);
+  }, [username, userId, isAdminUnlocked, currentUserDocRef, roomCode]);
 
   // =========================
   // ⏱️ Heartbeat utilisateur
   // =========================
-  // Permet d'indiquer qu'un utilisateur est toujours actif.
   useEffect(() => {
     if (!username || !userId) return;
 
@@ -178,15 +193,18 @@ export default function AdminUsers() {
   // =========================
   // 🚫 Déconnexion forcée à distance
   // =========================
-  // Si un admin déclenche forceLogoutAt, on nettoie la session locale.
   useEffect(() => {
     if (!userId) return;
+
+    let handled = false;
 
     const unsub = onSnapshot(currentUserDocRef, async (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
 
-      if (data?.forceLogoutAt) {
+      if (data?.forceLogoutAt && !handled) {
+        handled = true;
+
         try {
           await updateDoc(currentUserDocRef, {
             forceLogoutAt: null,
@@ -199,6 +217,7 @@ export default function AdminUsers() {
 
         localStorage.removeItem("username");
         localStorage.removeItem("isSpotifyAdmin");
+        localStorage.removeItem(roomCacheKey);
         localStorage.removeItem("sharedQueueCache");
 
         setShowUserMenu(false);
@@ -209,7 +228,7 @@ export default function AdminUsers() {
     });
 
     return () => unsub();
-  }, [currentUserDocRef, userId]);
+  }, [currentUserDocRef, userId, roomCacheKey]);
 
   useEffect(() => {
     return () => clearTimeout(toastTimeoutRef.current);
@@ -319,16 +338,18 @@ export default function AdminUsers() {
 
     localStorage.removeItem("username");
     localStorage.removeItem("isSpotifyAdmin");
+    localStorage.removeItem(roomCacheKey);
+    localStorage.removeItem("sharedQueueCache");
     setShowUserMenu(false);
     window.location.reload();
   };
 
   // =========================
-  // 👑 Actions admin à distance
+  // 👑 Actions admin à distance dans la room active
   // =========================
   const forceLogoutUser = async (targetUserId) => {
     try {
-      await updateDoc(doc(db, "users", targetUserId), {
+      await updateDoc(doc(db, "rooms", roomCode, "members", targetUserId), {
         forceLogoutAt: Date.now(),
         isConnected: false,
       });
@@ -340,7 +361,7 @@ export default function AdminUsers() {
 
   const toggleAdminRights = async (targetUser) => {
     try {
-      await updateDoc(doc(db, "users", targetUser.id), {
+      await updateDoc(doc(db, "rooms", roomCode, "members", targetUser.id), {
         isAdmin: !targetUser.isAdmin,
         lastSeen: Date.now(),
       });
@@ -360,7 +381,7 @@ export default function AdminUsers() {
     setDeletingId(userToDelete);
     setTimeout(async () => {
       try {
-        await deleteDoc(doc(db, "users", userToDelete));
+        await deleteDoc(doc(db, "rooms", roomCode, "members", userToDelete));
         showToast("Utilisateur supprimé");
       } catch (err) {
         console.error("delete user error:", err);
@@ -430,7 +451,6 @@ export default function AdminUsers() {
             <div style={styles.userAvatar}>
               {(user.name || "?").charAt(0).toUpperCase()}
             </div>
-            
           </div>
 
           <div style={styles.userContent}>
@@ -533,6 +553,8 @@ export default function AdminUsers() {
           </div>
         </div>
 
+        <div style={styles.roomBadge}>Room active : {roomCode}</div>
+
         <div style={styles.dashboardGrid}>
           <div style={styles.statCard}>
             <div style={styles.statValue}>{users.length}</div>
@@ -560,13 +582,19 @@ export default function AdminUsers() {
               {users.map((user) => renderUserItem(user))}
             </div>
           ) : (
-            <div style={styles.infoText}>Aucun utilisateur trouvé.</div>
+            <div style={styles.infoText}>Aucun utilisateur trouvé dans cette room.</div>
           )}
         </div>
 
         <div style={styles.homeReturnModule}>
+          <Link to={roomCode ? `/create-room?room=${roomCode}` : "/create-room"} style={styles.homeReturnButton}>
+            🏠 Room
+          </Link>
+          <Link to={roomCode ? `/app?room=${roomCode}` : "/app"} style={styles.homeReturnButton}>
+            🎵 Retour à la musique
+          </Link>
           <Link to="/" style={styles.homeReturnButton}>
-            ⬅️ Retour à l’accueil
+            ⬅️ Accueil
           </Link>
         </div>
       </div>
@@ -753,6 +781,18 @@ const styles = {
     lineHeight: 1.05,
     color: "#f8fafc",
   },
+  roomBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "8px 12px",
+    marginBottom: 16,
+    borderRadius: 999,
+    background: "rgba(29,185,84,0.14)",
+    border: "1px solid rgba(29,185,84,0.22)",
+    color: "#d1fae5",
+    fontWeight: "bold",
+    fontSize: 13,
+  },
   dashboardGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -863,21 +903,6 @@ const styles = {
     width: 52,
     height: 52,
     flexShrink: 0,
-  },
-  adminCrown: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    width: 24,
-    height: 24,
-    borderRadius: 999,
-    background: "rgba(234,179,8,0.18)",
-    border: "1px solid rgba(234,179,8,0.35)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 13,
-    boxShadow: "0 6px 16px rgba(0,0,0,0.24)",
   },
   userAvatar: {
     width: 52,
@@ -1097,6 +1122,8 @@ const styles = {
   homeReturnModule: {
     display: "flex",
     justifyContent: "flex-start",
+    gap: 10,
+    flexWrap: "wrap",
     marginTop: 14,
     marginBottom: 20,
   },
