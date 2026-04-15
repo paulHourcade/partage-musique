@@ -343,6 +343,27 @@ useEffect(() => {
         setIsAdminUnlocked(false);
       }
 
+      if (data?.removedFromRoomAt && !handled) {
+        handled = true;
+      
+        try {
+          await updateDoc(currentUserDocRef, {
+            removedFromRoomAt: null,
+            isConnected: false,
+          });
+        } catch (err) {
+          console.error("kick cleanup error:", err);
+        }
+      
+        localStorage.removeItem("currentRoomCode");
+        localStorage.removeItem("activeRoomId");
+        localStorage.removeItem("activeRoomCode");
+        localStorage.removeItem(`sharedQueueCache:${roomCode}`);
+      
+        window.location.href = "/";
+        return;
+      }
+
       if (data?.forceLogoutAt && !handled) {
         handled = true;
 
