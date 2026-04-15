@@ -239,11 +239,7 @@ export default function CreateRoom() {
         <div style={styles.appHeader}>
           <div style={styles.titleRow}>
             <div style={styles.header}>
-
               <h1 style={styles.title}>Créer ou rejoindre une room</h1>
-              <div style={styles.subtitle}>
-                Une playlist collaborative en temps réel. Un code à partager. Une ambiance commune.
-              </div>
             </div>
           </div>
 
