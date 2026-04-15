@@ -8,17 +8,28 @@ export default function Home() {
 
       <div style={styles.shell}>
         <div style={styles.stack}>
+          
+          {/* 🎵 ACCÈS MUSIQUE */}
           <Link to="/app" style={{ ...styles.moduleCard, ...styles.musicAccessCard }}>
             <div style={styles.moduleEmoji}>🎵</div>
             <div style={styles.moduleTitle}>Accéder à l’appli musique</div>
             <div style={styles.moduleAction}>Ouvrir maintenant</div>
           </Link>
 
+          {/* 🏠 CRÉATION ROOM */}
+          <Link to="/create-room" style={{ ...styles.moduleCard, ...styles.musicAccessCard }}>
+            <div style={styles.moduleEmoji}>🏠</div>
+            <div style={styles.moduleTitle}>Créer une room</div>
+            <div style={styles.moduleAction}>Lancer une soirée</div>
+          </Link>
+
+          {/* ⚙️ ADMIN */}
           <Link to="/admin-users" style={styles.moduleCard}>
             <div style={styles.moduleEmoji}>⚙️</div>
             <div style={styles.moduleTitle}>Administration</div>
             <div style={styles.moduleAction}>Accéder</div>
           </Link>
+
         </div>
 
         <div style={styles.appsSection}>
