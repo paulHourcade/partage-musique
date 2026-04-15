@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "./firebase";
+import { useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import {
   fetchSpotifyProfile,
@@ -165,14 +166,23 @@ export default function MusicApp() {
   // 🗂️ Références Firestore mémorisées
   // =========================
   // useMemo évite de recréer les références à chaque rendu.
-  const tracksCollectionRef = useMemo(() => collection(db, "tracks"), []);
+  const tracksCollectionRef = useMemo(() => collection(db, "rooms", roomCode, "tracks"), []);
   const currentUserDocRef = useMemo(() => doc(db, "users", userId), [userId]);
-  const historyCollectionRef = useMemo(() => collection(db, "playHistory"), []);
+  const historyCollectionRef = useMemo(() => collection(db, "rooms", roomCode, "playHistory"), []);
   const playerStateDocRef = useMemo(() => doc(db, "appState", "playerState"), []);
   const historyQueryRef = useMemo(
     () => query(historyCollectionRef, orderBy("playedAt", "desc"), limit(30)),
     [historyCollectionRef]
   );
+  
+  const [searchParams] = useSearchParams();
+  const roomCode = useMemo(() => {
+    return (
+      searchParams.get("room") ||
+      localStorage.getItem("currentRoomCode") ||
+      "default-room"
+    );
+  }, [searchParams]);
 
   // =========================
   // 🔄 Synchronisation temps réel de la playlist
