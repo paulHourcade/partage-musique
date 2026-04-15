@@ -165,6 +165,8 @@ export default function MusicApp() {
   const playerDeviceIdRef = useRef(null);
   const playerReadyRef = useRef(false);
   const tracksRef = useRef([]);
+  const launchStartedAtRef = useRef(0);
+const justStartedTrackRef = useRef(null);
 
   const [searchParams] = useSearchParams();
   const roomCode = useMemo(() => {
@@ -951,6 +953,14 @@ useEffect(() => {
           setCurrentPlaybackPosition(state.position || 0);
           setCurrentPlaybackDuration(currentTrack?.duration_ms || 0);
 
+
+          if (currentTrackId && state.position > 1500) {
+            if (justStartedTrackRef.current === currentTrackId) {
+              justStartedTrackRef.current = null;
+            }
+            manualPlayRef.current = false;
+          }
+
           if (currentTrackId) {
             lastTrackIdRef.current = currentTrackId;
           }
@@ -977,12 +987,20 @@ useEffect(() => {
             manualPlayRef.current = false;
             return;
           }
-
+          const justStarted =
+            justStartedTrackRef.current === currentTrackId &&
+            Date.now() - launchStartedAtRef.current < 5000;
+          
+          if (justStarted) {
+            return;
+          }
           const looksEnded =
+            !justStarted &&
             state.paused &&
             state.position === 0 &&
             previousTrackId &&
-            currentTrackId === previousTrackId;
+            currentTrackId === previousTrackId &&
+            currentPlaybackDuration > 0;
 
           if (
             autoplayEnabledRef.current &&
@@ -1329,6 +1347,9 @@ useEffect(() => {
       setPlayerError("Ce morceau n’a pas d’identifiant Spotify");
       return false;
     }
+    launchStartedAtRef.current = Date.now();
+    justStartedTrackRef.current = spotifyId;
+    manualPlayRef.current = !isAuto;
 
     launchInFlightRef.current = true;
 
@@ -1475,6 +1496,11 @@ useEffect(() => {
     setCurrentPlaybackDuration(0);
     lastTrackIdRef.current = firstTrack.spotifyId || null;
     historyLoggedTrackRef.current = null;
+
+    autoplayLockRef.current = true;
+    setTimeout(() => {
+      autoplayLockRef.current = false;
+    }, 5000);
 
     const started = await playSpotifyTrack(firstTrack.spotifyId);
 
