@@ -237,13 +237,7 @@ export default function CreateRoom() {
 
       <div style={styles.card}>
         <div style={styles.appHeader}>
-          <div style={styles.titleRow}>
-            <div style={styles.header}>
-              <h1 style={styles.title}>Créer ou rejoindre une room</h1>
-            </div>
-          </div>
-
-          <div style={styles.headerActions}>
+                    <div style={styles.headerActions}>
             {username ? (
               <button
                 style={styles.userMenuButton}
@@ -253,6 +247,13 @@ export default function CreateRoom() {
               </button>
             ) : null}
           </div>
+          <div style={styles.titleRow}>
+            <div style={styles.header}>
+              <h1 style={styles.title}>Créer ou rejoindre une room</h1>
+            </div>
+          </div>
+
+
         </div>
 
         <div style={styles.grid}>
