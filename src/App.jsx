@@ -7,7 +7,7 @@ import App3 from "./App3.jsx";
 import App4 from "./App4.jsx";
 import ScrollToTop from "./ScrollToTop.jsx";
 import AdminUsers from "./AdminUsers.jsx";
-import CreateRoom from "./CreateRoom";
+import CreateRoom from "./CreateRoom.jsx";
 
 export default function App() {
   return (
