@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "./firebase";
 import { useSearchParams } from "react-router-dom";
-import { Link } from "react-router-dom";
+import { Link } from "react-router-dom"; 
 import {
   fetchSpotifyProfile, 
   getSpotifyAccessToken,
