@@ -1,15 +1,50 @@
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 export default function Home() {
-  const currentRoomCode = localStorage.getItem("currentRoomCode") || "";
+  const [searchParams] = useSearchParams();
 
-  const musicLink = currentRoomCode
-    ? `/app?room=${encodeURIComponent(currentRoomCode)}`
-    : "/app";
+  const urlRoomCode = searchParams.get("room") || "";
 
-  const adminLink = currentRoomCode
-    ? `/admin-users?room=${encodeURIComponent(currentRoomCode)}`
-    : "/admin-users";
+  const [currentRoomCode, setCurrentRoomCode] = useState(() => {
+    return urlRoomCode || localStorage.getItem("currentRoomCode") || "";
+  });
+
+  useEffect(() => {
+    if (!urlRoomCode) return;
+
+    localStorage.setItem("currentRoomCode", urlRoomCode);
+    localStorage.setItem("activeRoomCode", urlRoomCode);
+    setCurrentRoomCode(urlRoomCode);
+  }, [urlRoomCode]);
+
+  const musicLink = useMemo(() => {
+    return currentRoomCode
+      ? `/app?room=${encodeURIComponent(currentRoomCode)}`
+      : "/app";
+  }, [currentRoomCode]);
+
+  const adminLink = useMemo(() => {
+    return currentRoomCode
+      ? `/admin-users?room=${encodeURIComponent(currentRoomCode)}`
+      : "/admin-users";
+  }, [currentRoomCode]);
+
+  const quitRoom = () => {
+    if (currentRoomCode) {
+      localStorage.removeItem(`sharedQueueCache:${currentRoomCode}`);
+    }
+
+    localStorage.removeItem("currentRoomCode");
+    localStorage.removeItem("activeRoomId");
+    localStorage.removeItem("activeRoomCode");
+
+    setCurrentRoomCode("");
+
+    if (window.location.search) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  };
 
   return (
     <div style={styles.page}>
@@ -19,8 +54,16 @@ export default function Home() {
       <div style={styles.shell}>
         {currentRoomCode ? (
           <div style={styles.activeRoomCard}>
-            <div style={styles.activeRoomLabel}>Room active</div>
-            <div style={styles.activeRoomCode}>{currentRoomCode}</div>
+            <div style={styles.activeRoomTopRow}>
+              <div>
+                <div style={styles.activeRoomLabel}>Room active</div>
+                <div style={styles.activeRoomCode}>{currentRoomCode}</div>
+              </div>
+
+              <button style={styles.quitRoomButton} onClick={quitRoom}>
+                Quitter la room
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -121,6 +164,13 @@ const styles = {
     border: "1px solid rgba(59,130,246,0.22)",
     boxShadow: "0 14px 40px rgba(0,0,0,0.24)",
   },
+  activeRoomTopRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 14,
+    flexWrap: "wrap",
+  },
   activeRoomLabel: {
     fontSize: 13,
     color: "#93c5fd",
@@ -134,6 +184,16 @@ const styles = {
     fontWeight: "bold",
     color: "#f8fafc",
     letterSpacing: 1.5,
+  },
+  quitRoomButton: {
+    padding: "11px 14px",
+    borderRadius: 14,
+    border: "1px solid rgba(248,113,113,0.26)",
+    background: "rgba(127,29,29,0.22)",
+    color: "#fecaca",
+    cursor: "pointer",
+    fontWeight: "bold",
+    whiteSpace: "nowrap",
   },
   stack: {
     display: "flex",
