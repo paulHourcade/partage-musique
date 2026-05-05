@@ -729,12 +729,27 @@ useEffect(() => {
     showToast("Mode admin activé");
   };
 
-  const lockAdminMode = () => {
+  const lockAdminMode = async () => {
     localStorage.removeItem("isSpotifyAdmin");
     setIsAdminUnlocked(false);
     setShowPinModal(false);
     setPinInput("");
     setPinError("");
+
+    try {
+      await setDoc(
+        currentUserDocRef,
+        {
+          isAdmin: false,
+          adminDisabledAt: Date.now(),
+        },
+        { merge: true }
+      );
+      showToast("Mode admin désactivé");
+    } catch (err) {
+      console.error("disable admin mode error:", err);
+      showToast("Mode admin désactivé localement");
+    }
   };
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
