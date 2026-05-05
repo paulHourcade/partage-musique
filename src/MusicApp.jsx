@@ -115,7 +115,6 @@ export default function MusicApp() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSpotifyMenu, setShowSpotifyMenu] = useState(false);
-  const [showRoomQrModal, setShowRoomQrModal] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
 
@@ -166,6 +165,9 @@ export default function MusicApp() {
   const playerDeviceIdRef = useRef(null);
   const playerReadyRef = useRef(false);
   const tracksRef = useRef([]);
+  const currentPlaybackDurationRef = useRef(0);
+  const currentPlaybackPositionRef = useRef(0);
+  const autoAdvanceTimeoutRef = useRef(null);
   const launchStartedAtRef = useRef(0);
   const justStartedTrackRef = useRef(null);
 
@@ -178,18 +180,6 @@ export default function MusicApp() {
     );
   }, [searchParams]);
   const queueCacheKey = useMemo(() => `sharedQueueCache:${roomCode}`, [roomCode]);
-  const roomShareUrl = useMemo(() => {
-    if (typeof window === "undefined") {
-      return `/app?room=${encodeURIComponent(roomCode)}`;
-    }
-
-    return `${window.location.origin}/app?room=${encodeURIComponent(roomCode)}`;
-  }, [roomCode]);
-  const roomQrCodeUrl = useMemo(() => {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=16&data=${encodeURIComponent(
-      roomShareUrl
-    )}`;
-  }, [roomShareUrl]);
 
   // =========================
   // 🗂️ Références Firestore mémorisées
@@ -484,6 +474,14 @@ useEffect(() => {
   }, [tracks]);
 
   useEffect(() => {
+    currentPlaybackDurationRef.current = currentPlaybackDuration;
+  }, [currentPlaybackDuration]);
+
+  useEffect(() => {
+    currentPlaybackPositionRef.current = currentPlaybackPosition;
+  }, [currentPlaybackPosition]);
+
+  useEffect(() => {
     if (playbackQueue.length === 0) return;
 
     const currentPlayingSpotifyId =
@@ -540,6 +538,7 @@ useEffect(() => {
       clearTimeout(spotifyTimeoutRef.current);
       clearTimeout(toastTimeoutRef.current);
       clearTimeout(reconnectTimeoutRef.current);
+      clearTimeout(autoAdvanceTimeoutRef.current);
       if (audioPreviewRef.current) {
         audioPreviewRef.current.pause();
       }
@@ -563,6 +562,57 @@ useEffect(() => {
 
     return () => clearInterval(interval);
   }, [isPaused, currentPlaybackDuration]);
+
+  useEffect(() => {
+    clearTimeout(autoAdvanceTimeoutRef.current);
+
+    if (
+      !isAdminUnlocked ||
+      !autoplayEnabled ||
+      isPaused ||
+      !currentPlayback?.id ||
+      !currentPlaybackDuration ||
+      playbackQueueRef.current.length === 0
+    ) {
+      return;
+    }
+
+    const remainingMs = currentPlaybackDuration - currentPlaybackPosition;
+
+    if (remainingMs <= 0 || remainingMs > 10 * 60 * 1000) return;
+
+    autoAdvanceTimeoutRef.current = setTimeout(async () => {
+      if (
+        autoplayLockRef.current ||
+        launchInFlightRef.current ||
+        !autoplayEnabledRef.current ||
+        playbackQueueRef.current.length === 0
+      ) {
+        return;
+      }
+
+      autoplayLockRef.current = true;
+
+      try {
+        await advanceToNextTrack("timer");
+      } catch (err) {
+        console.error("timer autoplay error:", err);
+      } finally {
+        setTimeout(() => {
+          autoplayLockRef.current = false;
+        }, 1200);
+      }
+    }, Math.max(remainingMs + 500, 900));
+
+    return () => clearTimeout(autoAdvanceTimeoutRef.current);
+  }, [
+    isAdminUnlocked,
+    autoplayEnabled,
+    isPaused,
+    currentPlayback?.id,
+    currentPlaybackPosition,
+    currentPlaybackDuration,
+  ]);
 
   const dominantArtistQuery = useMemo(() => {
     const artistCounts = {};
@@ -639,54 +689,6 @@ useEffect(() => {
     clearTimeout(toastTimeoutRef.current);
     setToastMessage(message);
     toastTimeoutRef.current = setTimeout(() => setToastMessage(""), 2500);
-  };
-
-  const copyTextToClipboard = async (text, successMessage) => {
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.opacity = "0";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textArea);
-      }
-
-      showToast(successMessage);
-    } catch (err) {
-      console.error("clipboard error:", err);
-      showToast("Impossible de copier");
-    }
-  };
-
-  const copyRoomCode = () => {
-    copyTextToClipboard(roomCode, "Code room copié");
-  };
-
-  const copyRoomLink = () => {
-    copyTextToClipboard(roomShareUrl, "Lien de la room copié");
-  };
-
-  const shareRoomLink = async () => {
-    if (navigator?.share) {
-      try {
-        await navigator.share({
-          title: "Rejoins ma room musique",
-          text: `Rejoins la room ${roomCode} sur Partage Musique`,
-          url: roomShareUrl,
-        });
-        return;
-      } catch {
-        // Si le partage natif est annulé ou indisponible, on propose la copie.
-      }
-    }
-
-    copyRoomLink();
   };
 
   // =========================
@@ -1010,9 +1012,14 @@ useEffect(() => {
             }
           }
 
+          const livePosition = state.position || 0;
+          const liveDuration = currentTrack?.duration_ms || currentPlaybackDurationRef.current || 0;
+
           setCurrentPlayback(currentTrack);
-          setCurrentPlaybackPosition(state.position || 0);
-          setCurrentPlaybackDuration(currentTrack?.duration_ms || 0);
+          setCurrentPlaybackPosition(livePosition);
+          setCurrentPlaybackDuration(liveDuration);
+          currentPlaybackPositionRef.current = livePosition;
+          currentPlaybackDurationRef.current = liveDuration;
 
 
           if (currentTrackId && state.position > 1500) {
@@ -1029,7 +1036,7 @@ useEffect(() => {
           await syncSharedPlayerState({
             isPaused: state.paused,
             position: state.position || 0,
-            duration: currentTrack?.duration_ms || 0,
+            duration: liveDuration,
             track: currentTrack
               ? {
                   id: currentTrack.id || null,
@@ -1061,7 +1068,7 @@ useEffect(() => {
             state.position === 0 &&
             previousTrackId &&
             currentTrackId === previousTrackId &&
-            currentPlaybackDuration > 0;
+            liveDuration > 0;
 
           if (
             autoplayEnabledRef.current &&
@@ -1072,52 +1079,7 @@ useEffect(() => {
             autoplayLockRef.current = true;
 
             try {
-              const finishedTrack =
-                playbackQueueRef.current[currentQueueIndexRef.current];
-
-              if (finishedTrack?.id) {
-                await archiveAndRemoveTrack(finishedTrack);
-              }
-
-              const remainingQueue = playbackQueueRef.current.filter(
-                (track) => track.id !== finishedTrack?.id
-              );
-
-              const nextTrack = remainingQueue[0];
-
-              if (nextTrack?.spotifyId) {
-                setPlaybackQueue(remainingQueue);
-                setCurrentQueueIndex(0);
-                setCurrentPlayback(null);
-                setCurrentPlaybackPosition(0);
-                setCurrentPlaybackDuration(0);
-                lastTrackIdRef.current = nextTrack.spotifyId || null;
-
-                await syncSharedPlayerState({
-                  isPaused: false,
-                  position: 0,
-                  duration: 0,
-                  track: buildTrackPayload(nextTrack),
-                  currentTrackSpotifyId: nextTrack.spotifyId || null,
-                  ...buildSharedQueueSnapshot(remainingQueue, 0),
-                });
-
-                await playSpotifyTrack(nextTrack.spotifyId, true);
-              } else {
-                setPlaybackQueue([]);
-                setCurrentQueueIndex(-1);
-                await syncSharedPlayerState({
-                  isPaused: true,
-                  position: 0,
-                  duration: 0,
-                  track: null,
-                  currentTrackSpotifyId: null,
-                  queueIndex: -1,
-                  queueLength: 0,
-                  queueTitle: "",
-                  queue: [],
-                });
-              }
+              await advanceToNextTrack("auto");
             } catch (err) {
               console.error("Autoplay error:", err);
             } finally {
@@ -1390,6 +1352,88 @@ useEffect(() => {
     return playerDeviceIdRef.current || playerDeviceId || null;
   };
 
+  const advanceToNextTrack = async (source = "auto") => {
+    if (!autoplayEnabledRef.current && source !== "manual") return false;
+    if (launchInFlightRef.current) return false;
+
+    const queueSnapshot = Array.isArray(playbackQueueRef.current)
+      ? [...playbackQueueRef.current]
+      : [];
+
+    if (queueSnapshot.length === 0) {
+      setPlayerError("Aucune file d’attente en cours");
+      return false;
+    }
+
+    const safeCurrentIndex =
+      currentQueueIndexRef.current >= 0 ? currentQueueIndexRef.current : 0;
+    const finishedTrack = queueSnapshot[safeCurrentIndex] || queueSnapshot[0];
+
+    const remainingQueue = finishedTrack?.id
+      ? queueSnapshot.filter((track) => track.id !== finishedTrack.id)
+      : queueSnapshot.slice(1);
+
+    const nextTrack = remainingQueue[0] || null;
+
+    if (finishedTrack?.id) {
+      await archiveAndRemoveTrack(finishedTrack);
+    }
+
+    if (!nextTrack?.spotifyId) {
+      playbackQueueRef.current = [];
+      currentQueueIndexRef.current = -1;
+      currentPlaybackDurationRef.current = 0;
+      currentPlaybackPositionRef.current = 0;
+
+      setPlaybackQueue([]);
+      setCurrentQueueIndex(-1);
+      setCurrentPlayback(null);
+      setCurrentPlaybackPosition(0);
+      setCurrentPlaybackDuration(0);
+
+      await syncSharedPlayerState({
+        isPaused: true,
+        position: 0,
+        duration: 0,
+        track: null,
+        currentTrackSpotifyId: null,
+        queueIndex: -1,
+        queueLength: 0,
+        queueTitle: "",
+        queue: [],
+      });
+
+      if (source === "manual") {
+        setPlayerError("Fin de file d’attente");
+      }
+
+      return false;
+    }
+
+    playbackQueueRef.current = remainingQueue;
+    currentQueueIndexRef.current = 0;
+    currentPlaybackDurationRef.current = 0;
+    currentPlaybackPositionRef.current = 0;
+
+    setPlaybackQueue(remainingQueue);
+    setCurrentQueueIndex(0);
+    setCurrentPlayback(null);
+    setCurrentPlaybackPosition(0);
+    setCurrentPlaybackDuration(0);
+    lastTrackIdRef.current = nextTrack.spotifyId || null;
+
+    await syncSharedPlayerState({
+      isPaused: false,
+      position: 0,
+      duration: 0,
+      track: buildTrackPayload(nextTrack),
+      currentTrackSpotifyId: nextTrack.spotifyId || null,
+      ...buildSharedQueueSnapshot(remainingQueue, 0),
+    });
+
+    return playSpotifyTrack(nextTrack.spotifyId, true);
+  };
+
   // =========================
   // ▶️ Contrôle de lecture Spotify
   // =========================
@@ -1549,6 +1593,10 @@ useEffect(() => {
     setCurrentPlayback(null);
     setCurrentPlaybackPosition(0);
     setCurrentPlaybackDuration(0);
+    currentPlaybackPositionRef.current = 0;
+    currentPlaybackDurationRef.current = 0;
+    playbackQueueRef.current = queue;
+    currentQueueIndexRef.current = 0;
     lastTrackIdRef.current = firstTrack.spotifyId || null;
     historyLoggedTrackRef.current = null;
 
@@ -1575,60 +1623,20 @@ useEffect(() => {
   };
 
   const playNextTrack = async () => {
-    if (playbackQueue.length === 0) {
-      setPlayerError("Aucune file d’attente en cours");
-      return;
+    if (autoplayLockRef.current) return;
+
+    autoplayLockRef.current = true;
+
+    try {
+      await advanceToNextTrack("manual");
+    } catch (err) {
+      console.error("playNextTrack error:", err);
+      setPlayerError("Impossible de passer au morceau suivant");
+    } finally {
+      setTimeout(() => {
+        autoplayLockRef.current = false;
+      }, 1200);
     }
-
-    const currentTrack =
-      playbackQueue[currentQueueIndex >= 0 ? currentQueueIndex : 0];
-
-    if (currentTrack?.id) {
-      await archiveAndRemoveTrack(currentTrack);
-    }
-
-    const remainingQueue = playbackQueueRef.current.filter(
-      (track) => track.id !== currentTrack?.id
-    );
-    const nextTrack = remainingQueue[0];
-
-    if (!nextTrack?.spotifyId) {
-      setPlaybackQueue([]);
-      setCurrentQueueIndex(-1);
-
-      await syncSharedPlayerState({
-        isPaused: true,
-        position: 0,
-        duration: 0,
-        track: null,
-        queueIndex: -1,
-        queueLength: 0,
-        queueTitle: "",
-        queue: [],
-        currentTrackSpotifyId: null,
-      });
-
-      setPlayerError("Fin de file d’attente");
-      return;
-    }
-
-    setPlaybackQueue(remainingQueue);
-    setCurrentQueueIndex(0);
-    setCurrentPlayback(null);
-    setCurrentPlaybackPosition(0);
-    setCurrentPlaybackDuration(0);
-    lastTrackIdRef.current = nextTrack.spotifyId || null;
-
-    await syncSharedPlayerState({
-      isPaused: false,
-      position: 0,
-      duration: 0,
-      track: buildTrackPayload(nextTrack),
-      currentTrackSpotifyId: nextTrack.spotifyId || null,
-      ...buildSharedQueueSnapshot(remainingQueue, 0),
-    });
-
-    await playSpotifyTrack(nextTrack.spotifyId);
   };
 
   const pausePlayback = async () => {
@@ -2228,34 +2236,6 @@ useEffect(() => {
           </div>
         </div>
 
-        {roomCode ? (
-          <div style={styles.activeRoomCard}>
-            <div style={styles.activeRoomTopRow}>
-              <div>
-                <div style={styles.activeRoomLabel}>Room active</div>
-                <div style={styles.activeRoomCode}>{roomCode}</div>
-              </div>
-
-              <button
-                style={styles.roomQrMiniButton}
-                onClick={() => setShowRoomQrModal(true)}
-                title="Afficher le QR code"
-              >
-                QR
-              </button>
-            </div>
-
-            <div style={styles.activeRoomActions}>
-              <button style={styles.roomActionButton} onClick={copyRoomCode}>
-                Copier le code
-              </button>
-              <button style={styles.roomActionButtonPrimary} onClick={shareRoomLink}>
-                Partager le lien
-              </button>
-            </div>
-          </div>
-        ) : null}
-
         {isAdminUnlocked && !spotifyUser && (
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
@@ -2681,44 +2661,6 @@ useEffect(() => {
 
       {toastMessage && <div style={styles.toast}>{toastMessage}</div>}
 
-      {showRoomQrModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <div style={styles.popupHeader}>
-              <div>
-                <div style={styles.modalTitle}>Partager la room</div>
-                <div style={styles.roomModalSubtitle}>Room {roomCode}</div>
-              </div>
-              <button
-                style={styles.popupCloseButton}
-                onClick={() => setShowRoomQrModal(false)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={styles.qrCodeBox}>
-              <img
-                src={roomQrCodeUrl}
-                alt={`QR code de la room ${roomCode}`}
-                style={styles.qrCodeImage}
-              />
-            </div>
-
-            <div style={styles.roomShareUrl}>{roomShareUrl}</div>
-
-            <div style={styles.modalActionsColumn}>
-              <button style={styles.modalConfirmFull} onClick={shareRoomLink}>
-                Partager le lien
-              </button>
-              <button style={styles.modalCancelFull} onClick={copyRoomCode}>
-                Copier uniquement le code
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showPinModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
@@ -2965,75 +2907,6 @@ const styles = {
     fontSize: 30,
     lineHeight: 1.05,
     color: "#f8fafc",
-  },
-  activeRoomCard: {
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 18,
-    background:
-      "linear-gradient(135deg, rgba(59,130,246,0.16), rgba(15,23,42,0.88), rgba(15,23,42,0.82))",
-    border: "1px solid rgba(59,130,246,0.26)",
-    boxShadow: "0 14px 40px rgba(0,0,0,0.24)",
-    backdropFilter: "blur(10px)",
-  },
-  activeRoomTopRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 14,
-  },
-  activeRoomLabel: {
-    fontSize: 11,
-    color: "#93c5fd",
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  activeRoomCode: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#f8fafc",
-    letterSpacing: 2,
-  },
-  activeRoomActions: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 10,
-  },
-  roomActionButton: {
-    padding: "11px 10px",
-    borderRadius: 13,
-    border: "1px solid rgba(148,163,184,0.18)",
-    background: "rgba(15,23,42,0.88)",
-    color: "#e2e8f0",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: 12,
-  },
-  roomActionButtonPrimary: {
-    padding: "11px 10px",
-    borderRadius: 13,
-    border: "1px solid rgba(29,185,84,0.24)",
-    background: "linear-gradient(135deg, #1DB954, #16a34a)",
-    color: "white",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: 12,
-    boxShadow: "0 8px 20px rgba(29,185,84,0.20)",
-  },
-  roomQrMiniButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    border: "1px solid rgba(147,197,253,0.28)",
-    background: "rgba(59,130,246,0.14)",
-    color: "#dbeafe",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: 15,
-    flexShrink: 0,
   },
   sectionCard: {
     background: "rgba(15, 23, 42, 0.82)",
@@ -3356,66 +3229,6 @@ const styles = {
     fontSize: 18,
     marginBottom: 10,
     color: "#f8fafc",
-  },
-  roomModalSubtitle: {
-    fontSize: 12,
-    color: "#93c5fd",
-    fontWeight: "bold",
-    marginTop: -4,
-    marginBottom: 12,
-    letterSpacing: 0.8,
-  },
-  qrCodeBox: {
-    background: "white",
-    borderRadius: 18,
-    padding: 14,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 14,
-  },
-  qrCodeImage: {
-    width: "100%",
-    maxWidth: 260,
-    height: "auto",
-    display: "block",
-  },
-  roomShareUrl: {
-    fontSize: 12,
-    color: "#cbd5e1",
-    background: "rgba(15,23,42,0.88)",
-    border: "1px solid rgba(148,163,184,0.14)",
-    borderRadius: 12,
-    padding: 10,
-    wordBreak: "break-all",
-    marginBottom: 14,
-  },
-  modalActionsColumn: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-    marginTop: 12,
-  },
-  modalConfirmFull: {
-    padding: "12px 13px",
-    borderRadius: 12,
-    border: "none",
-    background: "#1DB954",
-    color: "white",
-    cursor: "pointer",
-    fontWeight: "bold",
-    width: "100%",
-  },
-  modalCancelFull: {
-    padding: "12px 13px",
-    borderRadius: 12,
-    border: "1px solid rgba(148,163,184,0.18)",
-    background: "#111827",
-    color: "#f8fafc",
-    cursor: "pointer",
-    fontWeight: "bold",
-    width: "100%",
   },
   modalText: {
     fontSize: 14,
