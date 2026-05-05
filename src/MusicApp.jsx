@@ -715,18 +715,36 @@ useEffect(() => {
     window.location.reload();
   };
 
-  const unlockAdminMode = () => {
+  const unlockAdminMode = async () => {
     if (pinInput.trim() !== ADMIN_PIN) {
       setPinError("Code PIN incorrect");
       return;
     }
 
-    localStorage.setItem("isSpotifyAdmin", "true");
-    setIsAdminUnlocked(true);
-    setShowPinModal(false);
-    setPinInput("");
-    setPinError("");
-    showToast("Mode admin activé");
+    try {
+      await setDoc(
+        currentUserDocRef,
+        {
+          userId,
+          name: username || usernameInput.trim() || "Admin",
+          isAdmin: true,
+          adminEnabledAt: Date.now(),
+          isConnected: true,
+          lastSeen: Date.now(),
+        },
+        { merge: true }
+      );
+
+      localStorage.setItem("isSpotifyAdmin", "true");
+      setIsAdminUnlocked(true);
+      setShowPinModal(false);
+      setPinInput("");
+      setPinError("");
+      showToast("Mode admin activé");
+    } catch (err) {
+      console.error("enable admin mode error:", err);
+      setPinError("Impossible d’activer le mode admin");
+    }
   };
 
   const lockAdminMode = async () => {
