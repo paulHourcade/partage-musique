@@ -164,7 +164,6 @@ export default function MusicApp() {
   const isAdminUnlockedRef = useRef(false);
   const playerDeviceIdRef = useRef(null);
   const playerReadyRef = useRef(false);
-  const spotifyPlayerRef = useRef(null);
   const tracksRef = useRef([]);
   const launchStartedAtRef = useRef(0);
 const justStartedTrackRef = useRef(null);
@@ -462,10 +461,6 @@ useEffect(() => {
   useEffect(() => {
     playerReadyRef.current = playerReady;
   }, [playerReady]);
-
-  useEffect(() => {
-    spotifyPlayerRef.current = spotifyPlayer;
-  }, [spotifyPlayer]);
 
   useEffect(() => {
     isAdminUnlockedRef.current = isAdminUnlocked;
@@ -1311,7 +1306,7 @@ useEffect(() => {
   };
 
   const getPlayableDeviceId = async () => {
-    for (let attempt = 0; attempt < 12; attempt += 1) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       const freshDeviceId = playerDeviceIdRef.current || playerDeviceId;
       const freshReady = playerReadyRef.current || playerReady;
 
@@ -1319,18 +1314,16 @@ useEffect(() => {
         return freshDeviceId;
       }
 
-      const livePlayer = spotifyPlayerRef.current || spotifyPlayer;
-
-      if (livePlayer) {
+      if (spotifyPlayer) {
         try {
-          await livePlayer.activateElement();
-          await livePlayer.connect().catch(() => {});
+          await spotifyPlayer.activateElement();
+          await spotifyPlayer.connect().catch(() => {});
         } catch (err) {
           console.error("wake player error:", err);
         }
       }
 
-      await wait(attempt < 3 ? 350 : 700);
+      await wait(700);
     }
 
     return playerDeviceIdRef.current || playerDeviceId || null;
@@ -1365,48 +1358,32 @@ useEffect(() => {
     try {
       setPlayerError("");
 
-      const livePlayer = spotifyPlayerRef.current || spotifyPlayer;
+      if (freshToken !== spotifyToken) {
+        setSpotifyToken(freshToken);
+      }
 
-      if (livePlayer) {
-        await livePlayer.activateElement();
+      if (spotifyPlayer) {
+        await spotifyPlayer.activateElement();
       }
 
       const playableDeviceId = await getPlayableDeviceId();
 
       if (!playableDeviceId) {
         schedulePlayerReconnect("lecteur Spotify indisponible");
-        setPlayerError("Le lecteur Spotify n’est pas encore prêt. Clique sur Relancer Spotify puis réessaie.");
+        setPlayerError("Le lecteur Spotify n’est pas encore prêt");
         return false;
       }
-
-      const transferRes = await fetch("https://api.spotify.com/v1/me/player", {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${freshToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          device_ids: [playableDeviceId],
-          play: false,
-        }),
-      });
-
-      if (!transferRes.ok && transferRes.status !== 204) {
-        const transferText = await transferRes.text();
-        throw new Error(transferText || `Impossible de transférer la lecture (${transferRes.status})`);
-      }
-
-      await wait(450);
 
       const launchBody = JSON.stringify({
         uris: [`spotify:track:${spotifyId}`],
         position_ms: 0,
       });
 
-      let launched = false;
-      let lastPlayError = "";
+      let lastSpotifyError = "";
 
-      for (let attempt = 0; attempt < 3 && !launched; attempt += 1) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await wait(attempt === 0 ? 350 : 850);
+
         const playRes = await fetch(
           `https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(
             playableDeviceId
@@ -1421,58 +1398,72 @@ useEffect(() => {
           }
         );
 
-        if (playRes.ok || playRes.status === 204 || playRes.status === 202) {
-          launched = true;
+        if (playRes.ok || playRes.status === 204) {
+          lastTrackIdRef.current = spotifyId;
+          return true;
+        }
+
+        const playText = await playRes.text().catch(() => "");
+        lastSpotifyError = playText || `Erreur Spotify ${playRes.status}`;
+
+        const lowerError = lastSpotifyError.toLowerCase();
+
+        if (
+          playRes.status === 401 ||
+          playRes.status === 403 ||
+          lowerError.includes("premium") ||
+          lowerError.includes("scope") ||
+          lowerError.includes("restricted")
+        ) {
           break;
         }
 
-        lastPlayError = await playRes.text();
-
-        if (playRes.status === 401) {
-          throw new Error("Session Spotify expirée. Déconnecte/reconnecte Spotify puis réessaie.");
+        if (attempt === 1 && spotifyPlayer) {
+          try {
+            await spotifyPlayer.activateElement();
+            await spotifyPlayer.connect().catch(() => {});
+          } catch {
+            // ignore
+          }
         }
-
-        if (playRes.status === 403) {
-          throw new Error("Spotify refuse la lecture. Vérifie que le compte connecté est Premium et autorisé à lire sur ce lecteur.");
-        }
-
-        await wait(attempt === 0 ? 700 : 1100);
       }
 
-      if (!launched) {
-        throw new Error(lastPlayError || "La lecture Spotify n’a pas démarré automatiquement");
+      const fallbackState = await fetch(
+        "https://api.spotify.com/v1/me/player/currently-playing",
+        {
+          headers: {
+            Authorization: `Bearer ${freshToken}`,
+          },
+        }
+      )
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null);
+
+      if (fallbackState?.item?.id === spotifyId && fallbackState?.is_playing) {
+        lastTrackIdRef.current = spotifyId;
+        return true;
       }
 
-      lastTrackIdRef.current = spotifyId;
-
-      setTimeout(async () => {
-        const state = livePlayer
-          ? await livePlayer.getCurrentState().catch(() => null)
-          : null;
-
-        const liveTrack = state?.track_window?.current_track || null;
-
-        if (liveTrack?.id === spotifyId) {
-          setCurrentPlayback(liveTrack);
-          setCurrentPlaybackPosition(state.position || 0);
-          setCurrentPlaybackDuration(liveTrack.duration_ms || 0);
-          setIsPaused(Boolean(state.paused));
-        }
-      }, 1200);
-
-      return true;
+      throw new Error(
+        lastSpotifyError || "La lecture Spotify n’a pas démarré automatiquement"
+      );
     } catch (err) {
       console.error("playSpotifyTrack error:", err);
-      const safeMessage = err.message || "Impossible de lancer la lecture Spotify";
-      setPlayerError(safeMessage);
+      const rawMessage = err?.message || "Impossible de lancer la lecture Spotify";
+      const safeMessage = String(rawMessage);
+      const lowerMessage = safeMessage.toLowerCase();
 
-      if (
-        String(safeMessage).toLowerCase().includes("4040") ||
-        String(safeMessage).toLowerCase().includes("not found") ||
-        String(safeMessage).toLowerCase().includes("device") ||
-        String(safeMessage).toLowerCase().includes("lecteur")
-      ) {
+      if (lowerMessage.includes("premium")) {
+        setPlayerError("Compte Spotify Premium requis pour piloter la lecture.");
+      } else if (lowerMessage.includes("scope")) {
+        setPlayerError(
+          "Autorisation Spotify insuffisante : reconnecte Spotify pour accepter les droits de lecture."
+        );
+      } else if (lowerMessage.includes("device") || lowerMessage.includes("not found")) {
+        setPlayerError("Lecteur Spotify indisponible : clique sur Relancer Spotify puis réessaie.");
         schedulePlayerReconnect(safeMessage);
+      } else {
+        setPlayerError(safeMessage);
       }
 
       return false;
