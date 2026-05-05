@@ -178,6 +178,14 @@ export default function MusicApp() {
     );
   }, [searchParams]);
   const queueCacheKey = useMemo(() => `sharedQueueCache:${roomCode}`, [roomCode]);
+
+  useEffect(() => {
+    if (!roomCode || roomCode === "default-room") return;
+
+    localStorage.setItem("currentRoomCode", roomCode);
+    localStorage.setItem("activeRoomCode", roomCode);
+  }, [roomCode]);
+
   const roomShareUrl = useMemo(() => {
     if (typeof window === "undefined") {
       return `/app?room=${encodeURIComponent(roomCode)}`;
